@@ -57,8 +57,8 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="threading",
     logger=True,
-    engineio_logger=False,
-    path="travel/socket.io",
+    engineio_logger=False
+    #path="travel/socket.io",
 )
 logger.info("Socket.IO initialised (async_mode=threading)")
 
