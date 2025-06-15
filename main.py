@@ -89,18 +89,20 @@ def index():
             logger.error(f"Template error: {e}")
     
     # Fallback: serve simple HTML
-    return f"""
+    return """
     <!DOCTYPE html>
     <html>
     <head><title>PiText Travel</title></head>
     <body>
         <h1>PiText Travel Service</h1>
         <p>The service is running but some components failed to load.</p>
-        <p>Blueprint loaded: {blueprint_loaded}</p>
+        <p>Blueprint loaded: {}</p>
         <p>Check the logs for more details.</p>
     </body>
     </html>
-    """@app.route("/health")
+    """.format(blueprint_loaded)
+
+@app.route("/health")
 def health():
     """Health check endpoint"""
     return {"status": "ok", "blueprint_loaded": blueprint_loaded}
