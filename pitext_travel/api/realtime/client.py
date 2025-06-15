@@ -211,7 +211,10 @@ class RealtimeClient:
             event_type = event.get("type")
             
             logger.debug(f"Received event: {event_type}")
-            
+# Debug log all events
+            if event_type not in ["response.audio.delta", "response.audio_transcript.delta"]:
+                logger.info(f"Realtime API event: {event_type} - {event.get('item_id', 'no-id')}")
+                        
             # Route events to appropriate handlers
             if event_type == "session.created":
                 self._handle_session_created(event)

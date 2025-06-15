@@ -36,6 +36,11 @@ class AudioCapture {
             this.audioContext = new AudioContext({
                 sampleRate: this.sampleRate
             });
+            // Log actual sample rate
+            console.log('[AudioCapture] Audio context sample rate:', this.audioContext.sampleRate);
+            if (this.audioContext.sampleRate !== 24000) {
+                console.warn('[AudioCapture] Sample rate mismatch! Expected 24000, got:', this.audioContext.sampleRate);
+            }
             
             // Initialize VAD
             this.vadProcessor = new window.VADProcessor({
@@ -50,6 +55,9 @@ class AudioCapture {
             
             console.log('AudioCapture initialized successfully');
             return true;
+
+            // Create audio context
+
             
         } catch (error) {
             console.error('Failed to initialize audio capture:', error);

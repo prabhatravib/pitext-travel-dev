@@ -211,10 +211,11 @@ class WebSocketClient {
     }
     
     commitAudio() {
-        console.log('Committing audio buffer...');
-        return this.emit('commit_audio', {});
-    }
-    
+        console.log('[WebSocketClient] Committing audio buffer...');
+        const success = this.emit('commit_audio', {});
+        console.log('[WebSocketClient] Commit audio result:', success);
+        return success;
+    }    
     clearAudio() {
         return this.emit('clear_audio', {});
     }
