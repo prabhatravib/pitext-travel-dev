@@ -12,14 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, render_template
 from flask_cors import CORS
-# main.py
-from flask import Flask
-from pitext_travel.routes import socketio, NAMESPACE
-
-app = Flask(__name__)
-
-# hook socketio into your Flask app
-socketio.init_app(app)
+from flask_socketio import SocketIO
 
 # ------------------------------------------------------------------------------
 # Environment & logging
@@ -57,6 +50,19 @@ app.config.update(
 
 # CORS for local dev / front-end requests
 CORS(app, origins="*", supports_credentials=True)
+
+# ------------------------------------------------------------------------------
+# Socket.IO
+# ------------------------------------------------------------------------------
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="eventlet",
+    logger=True,
+    engineio_logger=True  
+    #path="travel/socket.io",
+)
+logger.info("Socket.IO initialised (async_mode=eventlet)")
 
 # ------------------------------------------------------------------------------
 # Load blueprint + websocket handlers
