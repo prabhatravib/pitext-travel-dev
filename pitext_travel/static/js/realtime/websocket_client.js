@@ -201,15 +201,16 @@ class WebSocketClient {
         console.log('Starting Realtime session...');
         return this.emit('start_session', {});
     }
-    
+
     sendAudioData(audioData) {
-        // Only send if we have valid audio data
-        if (!audioData || audioData.length === 0) {
-            return false;
-        }
-        return this.emit('audio_data', { audio: audioData });
+    if (!audioData || audioData.byteLength === 0) return false;
+    // Base64-encode the chunk
+    const b64 = btoa(
+        String.fromCharCode.apply(null, new Uint8Array(audioData))
+    );
+        return this.emit('audio_data', { audio: b64 });
     }
-    
+
     commitAudio() {
         console.log('[WebSocketClient] Committing audio buffer...');
         const success = this.emit('commit_audio', {});

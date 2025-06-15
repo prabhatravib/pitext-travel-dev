@@ -99,6 +99,10 @@ class RealtimeController {
       }
       this.stateMachine.onSpeechDetected();
     };
+    // In realtime_controller.js (or wherever you wire VAD → WS)
+    vadProcessor.on('speech_end', () => {
+      wsClient.commitAudio();  // emits 'commit_audio'
+    });
 
     this.audioCapture.onSpeechEnd = () => {
       this.wsClient.commitAudio();

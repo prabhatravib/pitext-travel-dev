@@ -108,26 +108,25 @@ class RealtimeClient:
                 logger.error(f"Failed to send event: {e}")
                 if self.on_error:
                     self.on_error(f"Failed to send event: {e}")
-    # new signature — self + ws argument
+# new signature — self + ws argument
     def _on_open(self, ws):
         """Handle WebSocket connection opened."""
-        # 1) Declare audio formats
+        # 1) Tell OpenAI we’re starting a session
         self._send_event({
             "type": "session.create",
             "input_audio_format": {"type": "pcm16", "sample_rate": 24000},
             "output_audio_format": {"type": "wav"}
         })
 
-        # 2) Mark connected
+        # 2) Mark “connected” so send_audio() will work
         logger.info(f"Realtime API connection established for session {self.session_id}")
         self.is_connected = True
 
-        # 3) Send your instructions & temperature
+        # 3) Push your instructions, tool definitions, temperature, etc.
         self.update_session(
             instructions=self.config["instructions"],
             temperature=self.config["temperature"]
         )
-
     
     def send_audio(self, audio_data: bytes):
         """Send audio data to OpenAI."""

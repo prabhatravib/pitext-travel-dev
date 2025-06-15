@@ -10,6 +10,8 @@ from typing import Optional, Callable
 
 from flask import request, session
 from flask_socketio import emit, disconnect
+from pitext_travel.api.realtime.session_manager import get_session_manager
+from pitext_travel.routes import socketio, NAMESPACE
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +259,21 @@ def register_websocket_handlers(socketio) -> None:
             logger.exception("Error starting session: %s", exc)
             emit("error", {"message": f"Failed to start session: {str(exc)}"})
 
+    @socketio.on("commit_audio", namespace=NAMESPACE)
+    def handle_commit_audio():
+        """Freeze the audio buffer and ask the Realtime API to reply."""
+        # 1) Look up the current rts_* session ID stored in flask.session
+        session_id = session.get("realtime_session_id")
+        if not session_id:
+            return
+
+        # 2) Grab the RealtimeClient wrapper for this session
+        rt_session = get_session_manager().get_session(session_id)
+        if not rt_session:
+            return
+
+        # 3) Tell the OpenAI client to commit and create a response
+        rt_session.client.commit_audio()
 
         # pitext_travel/routes/websocket.py
     @socketio.on("map_ready", namespace=NAMESPACE)
