@@ -191,4 +191,3 @@ class RealtimeController {
 
 // ─── Export ──────────────────────────────────────────────────
 window.RealtimeController = RealtimeController;  // for legacy code
-export { RealtimeController };                   // ES-module export
