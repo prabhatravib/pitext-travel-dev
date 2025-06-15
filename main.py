@@ -88,11 +88,6 @@ except ImportError as exc:
 except Exception as exc:
     logger.exception("Error setting up routes: %s", exc)
 
-# ------------------------------------------------------------------------------
-# Routes
-# ------------------------------------------------------------------------------
-
-
 # Debug Socket.IO configuration
 @app.route('/socket.io/socket.io.js')
 def serve_socketio_js():
@@ -100,9 +95,11 @@ def serve_socketio_js():
     logger.error("Socket.IO JS request hit Flask route - this shouldn't happen!")
     return "Socket.IO should handle this automatically", 404
 
-# Log Socket.IO configuration
-logger.info(f"Socket.IO configured with path: {socketio.server.eio.path}")
+logger.info("Socket.IO configured successfully")
 
+# ------------------------------------------------------------------------------
+# Routes
+# ------------------------------------------------------------------------------
 @app.route("/")
 def index():
     """Root route."""
@@ -124,7 +121,6 @@ def index():
         200,
         {"Content-Type": "text/html"},
     )
-
 
 @app.route("/health")
 def health():

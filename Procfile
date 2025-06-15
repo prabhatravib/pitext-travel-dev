@@ -1,1 +1,1 @@
-web: gunicorn -k eventlet -w 1 --timeout 120 --keep-alive 5 --log-level info main:app
+web: gunicorn -k eventlet -w 1 --timeout 120 --keep-alive 5 --log-level debug --access-logfile - --error-logfile - main:app
