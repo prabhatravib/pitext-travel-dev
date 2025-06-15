@@ -108,6 +108,32 @@ class RealtimeClient:
                 logger.error(f"Failed to send event: {e}")
                 if self.on_error:
                     self.on_error(f"Failed to send event: {e}")
+    
+    def _on_open(self):
+    # 1) Create the realtime session, declaring audio I/O formats
+        self._send_event({
+            "type": "session.create",
+            "input_audio_format": {
+                "type": "pcm16",
+                "sample_rate": 24000
+            },
+            "output_audio_format": {
+                "type": "wav"
+            }
+        })
+
+        # 2) Log that the websocket is connected
+        logger.info(
+            f"Realtime API connection established for session {self.session_id}"
+        )
+        self.is_connected = True
+
+        # 3) Send your initial chat instructions & parameters
+        self.update_session(
+            instructions=self.config["instructions"],
+            temperature=self.config["temperature"]
+        )
+
 
     
     def send_audio(self, audio_data: bytes):
@@ -195,30 +221,6 @@ class RealtimeClient:
         
         self._send_event(session_update)
 
-    def _on_open(self):
-        # 1) Create the realtime session, declaring audio I/O formats
-        self._send_event({
-            "type": "session.create",
-            "input_audio_format": {
-                "type": "pcm16",
-                "sample_rate": 24000
-            },
-            "output_audio_format": {
-                "type": "wav"
-            }
-        })
-
-        # 2) Log that the websocket is connected
-        logger.info(
-            f"Realtime API connection established for session {self.session_id}"
-        )
-        self.is_connected = True
-
-        # 3) Send your initial chat instructions & parameters
-        self.update_session(
-            instructions=self.config["instructions"],
-            temperature=self.config["temperature"]
-        )
  
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages."""
