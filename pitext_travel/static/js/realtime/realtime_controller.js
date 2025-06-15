@@ -6,7 +6,7 @@
 // ─── Module imports ───────────────────────────────────────────
 if (!window.AudioCapture || !window.AudioPlayer || !window.WebSocketClient || !window.VoiceStateMachine) {
   console.error('RealtimeController dependencies not loaded');
-
+}
 // ─── Class definition ─────────────────────────────────────────
 class RealtimeController {
   /*-----------------------------------------------------------
