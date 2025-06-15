@@ -20,7 +20,8 @@ def create_travel_blueprint(base_dir):
         __name__,
         template_folder=os.path.join(base_dir, 'templates'),
         static_folder=os.path.join(base_dir, 'static'),
-        static_url_path='/static'
+        static_url_path='/static',
+        url_prefix="/travel"
     )
     
     @travel_bp.route("/")

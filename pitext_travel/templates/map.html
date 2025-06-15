@@ -163,7 +163,7 @@
         // Test Socket.IO connection with better error handling
         const testSocket = io('/travel/ws', {
             transports: ['polling', 'websocket'],
-            path: '/travel/socket.io/',  // Add this line
+            path: '/socket.io/',  // Add this line
             reconnection: false,
             timeout: 10000,
             forceNew: true

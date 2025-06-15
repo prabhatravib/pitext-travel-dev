@@ -38,7 +38,7 @@ class WebSocketClient {
                 // Connect to WebSocket namespace
                 this.socket = io(this.namespace, {
                     transports: ['websocket', 'polling'], // Allow polling as fallback
-                    path: '/travel/socket.io/', 
+                    path: '/socket.io/', 
                     reconnection: true,
                     reconnectionAttempts: this.maxReconnectAttempts,
                     reconnectionDelay: 1000,
