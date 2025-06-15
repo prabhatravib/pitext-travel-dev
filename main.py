@@ -2,7 +2,7 @@
 PiText-Travel - main application entry point
 """
 import eventlet
-eventlet.monkey_patch()
+eventlet.monkey_patch(thread=True, socket=True)
 
 import logging
 import os
@@ -59,8 +59,10 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="eventlet",
     logger=True,
-    engineio_logger=False
-    #path="travel/socket.io",
+    engineio_logger=False,
+    path="/socket.io",  # Explicitly set the path
+    ping_interval=25,
+    ping_timeout=60
 )
 logger.info("Socket.IO initialised (async_mode=eventlet)")
 
@@ -89,6 +91,18 @@ except Exception as exc:
 # ------------------------------------------------------------------------------
 # Routes
 # ------------------------------------------------------------------------------
+
+
+# Debug Socket.IO configuration
+@app.route('/socket.io/socket.io.js')
+def serve_socketio_js():
+    """Fallback route to debug Socket.IO JS serving"""
+    logger.error("Socket.IO JS request hit Flask route - this shouldn't happen!")
+    return "Socket.IO should handle this automatically", 404
+
+# Log Socket.IO configuration
+logger.info(f"Socket.IO configured with path: {socketio.server.eio.path}")
+
 @app.route("/")
 def index():
     """Root route."""

@@ -31,3 +31,5 @@ httpx<0.27
 websocket-client>=1.7
 
 eventlet>=0.34
+
+# WebSocket and real-time communication

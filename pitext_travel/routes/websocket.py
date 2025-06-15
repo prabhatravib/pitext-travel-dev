@@ -7,6 +7,7 @@ import base64
 import logging
 import time
 from typing import Optional, Callable
+import secrets
 
 from flask import request, session
 from flask_socketio import emit, disconnect
@@ -167,17 +168,23 @@ def register_websocket_handlers(socketio) -> None:
     # ------------------------------ CONNECT ---------------------------------- #
     @socketio.on("connect", namespace=NAMESPACE)
     def handle_connect(auth):  # noqa: ANN001
-        user_ip = request.remote_addr
+        user_ip = request.remote_addr or request.environ.get('HTTP_X_FORWARDED_FOR', 'unknown')
         origin = request.headers.get("Origin", "unknown")
         logger.info("WebSocket connected from %s (origin: %s)", user_ip, origin)
 
         try:
-            # Lazy import avoids circulars
+            # Import here to avoid circular imports
             from pitext_travel.api.realtime.session_manager import get_session_manager
 
+            # Get or create Flask session ID
+            if '_id' not in session:
+                session['_id'] = secrets.token_urlsafe(16)
+                session.permanent = True
+            
             flask_sid = session.get("_id", "anonymous")
             manager = get_session_manager()
 
+            # Check for existing session first
             realtime_session = manager.get_session_by_flask_id(flask_sid)
             if realtime_session is None:
                 realtime_session = manager.create_session(user_ip, flask_sid)
@@ -192,6 +199,7 @@ def register_websocket_handlers(socketio) -> None:
                     return
 
             session["realtime_session_id"] = realtime_session.session_id
+            session.modified = True  # Ensure session is saved
 
             logger.info("Session created: %s", realtime_session.session_id)
             emit(
@@ -201,11 +209,10 @@ def register_websocket_handlers(socketio) -> None:
                     "status": "connected",
                 },
             )
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             logger.exception("Error in connect handler: %s", exc)
-            emit("error", {"message": "Connection failed"})
+            emit("error", {"message": f"Connection failed: {str(exc)}"})
             disconnect()
-
     # -------------------------- START REALTIME SESSION ----------------------- #
     @socketio.on("start_session", namespace=NAMESPACE)
     def handle_start_session(data):  # noqa: ANN001
