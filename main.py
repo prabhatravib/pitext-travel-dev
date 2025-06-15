@@ -1,24 +1,20 @@
 """
 PiText‑Travel – main application entry point
-
-* Flask app + Socket.IO 5 exposed as an **ASGI** application so it can be mounted
-  by the root monorepo service that already runs under Uvicorn.
-* No eventlet/gevent required. Everything runs on the default asyncio loop.
-* The Socket.IO path is `/socket.io/`, which must be used by the
-  JavaScript client.
 """
 
 import os
 import logging
+import sys
 
-from flask import Flask
+from flask import Flask, redirect, url_for, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
-# --------------------------------------------------------------------------- #
+# Add current directory to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 # Environment & logging
-# --------------------------------------------------------------------------- #
 load_dotenv()
 
 logging.basicConfig(
@@ -27,9 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --------------------------------------------------------------------------- #
 # Flask initialisation
-# --------------------------------------------------------------------------- #
 app = Flask(__name__)
 
 flask_secret_key = os.getenv("FLASK_SECRET_KEY") or os.urandom(32).hex()
@@ -47,9 +41,7 @@ app.config.update(
 # CORS for local dev / cross‑origin front‑end requests
 CORS(app, origins="*", supports_credentials=True)
 
-# --------------------------------------------------------------------------- #
 # Socket.IO – ASGI mode
-# --------------------------------------------------------------------------- #
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
@@ -60,29 +52,58 @@ socketio = SocketIO(
 )
 logger.info("Socket.IO initialised (async_mode=threading)")
 
-# --------------------------------------------------------------------------- #
-# Blueprints & WebSocket handlers
-# --------------------------------------------------------------------------- #
+# Try to load blueprints and websocket handlers
+blueprint_loaded = False
 try:
-    from pitext_travel.routes.travel import create_travel_blueprint
-    from pitext_travel.routes.websocket import register_websocket_handlers
+    from routes.travel import create_travel_blueprint
+    from routes.websocket import register_websocket_handlers
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    app.register_blueprint(create_travel_blueprint(base_dir))
+    travel_bp = create_travel_blueprint(base_dir)
+    app.register_blueprint(travel_bp)
     register_websocket_handlers(socketio)
+    
+    blueprint_loaded = True
+    logger.info("Successfully loaded routes and websocket handlers")
     
 except ImportError as e:
     logger.error(f"Failed to import modules: {e}")
-    logger.error("Make sure you're running from the correct directory")
+    logger.error("Application will run with limited functionality")
+except Exception as e:
+    logger.error(f"Error setting up routes: {e}")
 
-# --------------------------------------------------------------------------- #
-# Diagnostic routes (optional)
-# --------------------------------------------------------------------------- #
+# Routes
 @app.route("/")
 def index():
-    """Root route - redirect to travel interface"""
-    from flask import redirect, url_for
-    return redirect(url_for('travel.index'))
+    """Root route"""
+    if blueprint_loaded:
+        try:
+            return redirect(url_for('travel.index'))
+        except:
+            pass
+    
+    # Fallback: serve template directly
+    try:
+        return render_template('map.html')
+    except Exception as e:
+        logger.error(f"Template error: {e}")
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>PiText Travel</title></head>
+        <body>
+            <h1>PiText Travel Service</h1>
+            <p>The service is running but some components failed to load.</p>
+            <p>Error: {str(e)}</p>
+            <p>Check the logs for more details.</p>
+        </body>
+        </html>
+        """
+
+@app.route("/health")
+def health():
+    """Health check endpoint"""
+    return {"status": "ok", "blueprint_loaded": blueprint_loaded}
 
 @app.route("/test-socketio")
 def test_socketio():
@@ -122,15 +143,14 @@ def debug():
     return {
         "status": "ok",
         "socketio_initialized": True,
+        "blueprint_loaded": blueprint_loaded,
         "endpoints": {
             "websocket_test": "/test-socketio",
             "websocket_namespace": "/travel/ws",
         },
     }
 
-# --------------------------------------------------------------------------- #
-# Default namespace events (optional logging)
-# --------------------------------------------------------------------------- #
+# Default namespace events
 @socketio.on("connect")
 def _connect():
     logger.info("Client connected to default namespace")
@@ -139,15 +159,17 @@ def _connect():
 def _disconnect():
     logger.info("Client disconnected from default namespace")
 
-# --------------------------------------------------------------------------- #
 # Main execution
-# --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    logger.info("Starting travel app on http://localhost:%d", port)
-    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)
+    host = os.getenv("HOST", "0.0.0.0")
+    debug = os.getenv("FLASK_ENV") == "development"
+    
+    logger.info(f"Starting travel app on {host}:{port}")
+    logger.info(f"Debug mode: {debug}")
+    logger.info(f"Blueprint loaded: {blueprint_loaded}")
+    
+    socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
 
-# --------------------------------------------------------------------------- #
 # Export for ASGI servers
-# --------------------------------------------------------------------------- #
 __all__ = ["app", "socketio"]
