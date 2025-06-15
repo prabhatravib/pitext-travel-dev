@@ -2,41 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>PiText - Travel (Voice Enabled)</title>
+  <title>PiText – Travel (Voice Enabled)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" type="image/x-icon" href="/static/PiText_favicon.ico" />
 
+  <!---- core styles ---->
   <link rel="stylesheet" href="/static/css/base.css" />
   <link rel="stylesheet" href="/static/css/map.css" />
   <link rel="stylesheet" href="/static/css/controls.css" />
   <link rel="stylesheet" href="/static/css/panel.css" />
-  <link rel="stylesheet" href="/static/css/chat.css"/>
-  <link rel="stylesheet" href="/static/css/vad.css"/>
+  <link rel="stylesheet" href="/static/css/chat.css" />
+  <link rel="stylesheet" href="/static/css/vad.css" />
 </head>
+
 <body>
+  <!---- map canvas ---->
   <div id="map">
     <div class="loading">
       <p>🗺️ Ready to plan your trip?</p>
-      <p><small>Enter a city & days, then click "Start Planning".</small></p>
+      <p><small>Enter a city & days, then click <em>Start Planning</em>.</small></p>
     </div>
   </div>
 
-  <!-- VAD status indicator -->
+  <!---- indicators ---->
   <div id="vad-indicator" class="vad-indicator">
-    <div class="pulse"></div>
-    <span>Listening...</span>
+    <div class="pulse"></div><span>Listening…</span>
   </div>
 
-  <!-- Voice status indicator -->
   <div id="voice-status" class="voice-status">
     <div class="voice-circle">
       <svg viewBox="0 0 24 24" width="24" height="24">
         <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
       </svg>
     </div>
-    <span class="status-text">Initializing...</span>
+    <span class="status-text">Initializing…</span>
   </div>
 
+  <!---- side-chat & controls ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
 
   <div id="panel">
@@ -44,8 +46,8 @@
     <div id="inner-panel">
       <div id="day-controls"></div>
       <form id="trip-form">
-        <input id="city" type="text" placeholder="Enter city name" value="Paris" required />
-        <input id="days" type="number" min="1" max="14" value="3" required />
+        <input id="city"  type="text"     placeholder="Enter city name" value="Paris" required />
+        <input id="days"  type="number"   min="1" max="14" value="3"     required />
         <button type="submit">Start Planning</button>
       </form>
     </div>
@@ -53,241 +55,146 @@
 
   <div id="map-overlay"></div>
 
-<!-- Load Socket.IO first with better error handling -->
-  <script>
-    // Enhanced Socket.IO loading with fallback
-    (function loadSocketIO() {
-      function trySocketIO(src, callback) {
-        const script = document.createElement('script');
-        script.src = src;
-        script.async = true;
-        script.onload = () => {
-          console.log(`Socket.IO loaded from: ${src}`);
-          // Test if Socket.IO is actually available
-          if (typeof io !== 'undefined') {
-            callback(true);
-          } else {
-            console.error('Socket.IO loaded but not available globally');
-            callback(false);
-          }
-        };
-        script.onerror = () => {
-          console.warn(`Failed to load Socket.IO from: ${src}`);
-          callback(false);
-        };
-        document.head.appendChild(script);
-      }
+  <!--────────────────────────  JS SECTION  ────────────────────────-->
 
-      // Try local first, then CDN fallback
-      trySocketIO('/socket.io/socket.io.js', (success) => {
-        if (!success) {
-          console.log('Trying CDN fallback for Socket.IO...');
-          trySocketIO('https://cdn.socket.io/4.7.2/socket.io.min.js', (success) => {
-            if (!success) {
-              console.error('Failed to load Socket.IO from all sources');
-              // Update voice status to show error
-              const statusEl = document.getElementById('voice-status');
-              if (statusEl) {
-                statusEl.innerHTML = '<span class="status-text">Voice unavailable - Socket.IO failed to load</span>';
-                setTimeout(() => statusEl.style.display = 'none', 5000);
-              }
-            } else {
-              console.log('Socket.IO loaded successfully from CDN');
-            }
-          });
-        } else {
-          console.log('Socket.IO loaded successfully from local server');
-        }
+  <!-- 0️⃣  Socket.IO (local → CDN fallback) -->
+  <script>
+    (function loadSocketIO () {
+      function trySrc (src, done) {
+        const s = document.createElement('script');
+        s.src = src; s.async = true;
+        s.onload  = () => done(typeof io !== 'undefined');
+        s.onerror = () => done(false);
+        document.head.appendChild(s);
+      }
+      trySrc('/socket.io/socket.io.js', ok => {
+        if (ok) return console.log('[IO] loaded locally');
+        console.warn('[IO] local failed – trying CDN');
+        trySrc('https://cdn.socket.io/4.7.2/socket.io.min.js', ok2 => {
+          if (!ok2) {
+            console.error('[IO] failed everywhere – voice disabled');
+            document.getElementById('voice-status').style.display = 'none';
+          } else console.log('[IO] loaded from CDN');
+        });
       });
     })();
   </script>
-  <!-- Core utilities -->
-<!-- Change from /static/ ... to /static/... -->
-<script src="/static/js/utils/constants.js"></script>
-<script src="/static/js/utils/helpers.js"></script>
-<!-- etc for all other script/CSS paths -->
-  <!-- API and UI components -->
+
+  <!-- 1️⃣  Core utilities -->
+  <script src="/static/js/utils/constants.js"></script>
+  <script src="/static/js/utils/helpers.js"></script>
+
+  <!-- 2️⃣  API + UI layers -->
   <script src="/static/js/api/config.js"></script>
   <script src="/static/js/api/client.js"></script>
   <script src="/static/js/ui/overlays.js"></script>
   <script src="/static/js/ui/panel.js"></script>
   <script src="/static/js/ui/form.js"></script>
 
-  <!-- Google Maps -->
+  <!-- 3️⃣  Google Maps + map helpers -->
   <script src="/static/js/map/google-maps.js"></script>
+  <script async src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 
-  <!-- Map modules loader -->
   <script>
-    window.loadMapModules = function() {
-      const modules = [
+    /* map helper loader (parallel is okay here) */
+    window.loadMapModules = () => {
+      const list = [
         '/static/js/map/markers.js',
-        '/static/js/map/routes.js', 
+        '/static/js/map/routes.js',
         '/static/js/map/controls.js'
       ];
-      
-      let loadedCount = 0;
-      const checkComplete = () => {
-        loadedCount++;
-        if (loadedCount === modules.length) {
-          window.mapModulesReady = true;
-          console.log('All map modules loaded successfully');
-          
-          if (window.pendingRender) {
-            console.log('Processing pending render...');
-            window.TravelApp.renderTripOnMap(window.pendingRender);
-            window.pendingRender = null;
-          }
-        }
-      };
-      
-      modules.forEach(src => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = checkComplete;
-        script.onerror = () => console.error(`Failed to load: ${src}`);
-        document.head.appendChild(script);
+      let done = 0;
+      list.forEach(src => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload  = () => (++done === list.length) && (
+          window.mapModulesReady = true,
+          console.log('[MAP] all modules loaded'),
+          window.pendingRender && (window.TravelApp.renderTripOnMap(window.pendingRender),
+                                   window.pendingRender = null)
+        );
+        s.onerror = () => console.error('[MAP] failed:', src);
+        document.head.appendChild(s);
       });
     };
   </script>
 
-  <!-- Marker clusterer -->
-  <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
-
-  <!-- Realtime Voice (VAD) modules - load after Socket.IO -->
+  <!-- 4️⃣  Voice stack – sequential loader to preserve order -->
   <script>
-    // Wait for Socket.IO to be available before loading voice modules
-    function waitForSocketIO(callback, retries = 50) {
-      if (window.io) {
-        console.log('Socket.IO is ready, testing connection...');
-        
-        // Test Socket.IO connection with better error handling
-        const testSocket = io('/travel/ws', {
-            transports: ['polling', 'websocket'],
-            path: '/socket.io/',  // Add this line
-            reconnection: false,
-            timeout: 10000,
-            forceNew: true
-        });        
-        testSocket.on('connect', () => {
-          console.log('Socket.IO test connection successful');
-          testSocket.disconnect();
-          callback();
-        });
-        
-        testSocket.on('connect_error', (error) => {
-          console.error('Socket.IO connection error:', error.message, error.type);
-          
-          // Hide voice UI on connection failure
-          const statusEl = document.getElementById('voice-status');
-          if (statusEl) {
-            statusEl.innerHTML = '<span class="status-text">Voice unavailable - connection error</span>';
-            setTimeout(() => {
-              statusEl.style.display = 'none';
-            }, 3000);
-          }
-          
-          // Still load the app without voice
-          console.log('Continuing without voice support');
-        });
-        
-      } else if (retries > 0) {
-        setTimeout(() => waitForSocketIO(callback, retries - 1), 100);
-      } else {
-        console.error('Socket.IO failed to load after all retries');
-        const statusEl = document.getElementById('voice-status');
-        if (statusEl) {
-          statusEl.style.display = 'none';
-        }
+    function loadVoiceWhenIOReady () {
+      if (!window.io) return setTimeout(loadVoiceWhenIOReady, 100);
+
+      /* quick connectivity probe */
+      const probe = io('/travel/ws', {
+        transports  : ['polling', 'websocket'],
+        path        : '/socket.io/',
+        reconnection: false,
+        timeout     : 10000,
+        forceNew    : true
+      });
+
+      probe.once('connect', ()  => { probe.disconnect(); sequentialLoad(); });
+      probe.once('connect_error', err => {
+        console.error('[IO] probe failed:', err.message);
+        document.getElementById('voice-status').style.display = 'none';
+      });
+
+      function sequentialLoad () {
+        console.log('[VOICE] loading modules…');
+        const files = [
+          '/static/js/realtime/vad_processor.js',
+          '/static/js/realtime/audio_capture.js',
+          '/static/js/realtime/audio_player.js',
+          '/static/js/realtime/voice_state_machine.js',
+          '/static/js/realtime/websocket_client.js',
+          '/static/js/realtime/realtime_controller.js'
+        ];
+
+        (function next (i = 0) {
+          if (i >= files.length) return afterVoiceLoaded();
+          const s = document.createElement('script');
+          s.src = files[i];
+          s.onload  = () => next(i + 1);
+          s.onerror = () => {
+            console.error('[VOICE] failed:', files[i]);
+            document.getElementById('voice-status').style.display = 'none';
+          };
+          document.head.appendChild(s);
+        })();
+      }
+
+      function afterVoiceLoaded () {
+        console.log('[VOICE] stack ready');
+
+        /* load chat.js then vad_init.js */
+        const chat = document.createElement('script');
+        chat.src = '/static/js/chat.js';
+        chat.onload = () => {
+          const init = document.createElement('script');
+          init.src = '/static/js/vad_init.js';
+          init.onload  = () => console.log('[VOICE] init complete');
+          init.onerror = () => console.error('[VOICE] failed: vad_init.js');
+          document.head.appendChild(init);
+        };
+        chat.onerror = () => console.error('[VOICE] failed: chat.js');
+        document.head.appendChild(chat);
       }
     }
-
-    // Load voice modules in sequence
-    function loadVoiceModules() {
-      console.log('Loading voice modules...');
-      
-      const voiceModules = [
-        '/static/js/realtime/vad_processor.js',
-        '/static/js/realtime/audio_capture.js',
-        '/static/js/realtime/audio_player.js',
-        '/static/js/realtime/voice_state_machine.js',
-        '/static/js/realtime/websocket_client.js',
-        '/static/js/realtime/realtime_controller.js'
-      ];
-
-      let loadedCount = 0;
-      let failedModules = [];
-      
-      const checkComplete = (src, success) => {
-        loadedCount++;
-        if (!success) {
-          failedModules.push(src);
-        }
-        
-        if (loadedCount === voiceModules.length) {
-          if (failedModules.length > 0) {
-            console.error('Failed to load voice modules:', failedModules);
-            // Hide voice UI if modules failed to load
-            const statusEl = document.getElementById('voice-status');
-            if (statusEl) {
-              statusEl.style.display = 'none';
-            }
-          } else {
-            console.log('All voice modules loaded successfully');
-            // Load chat and VAD initializer
-            const chatScript = document.createElement('script');
-            chatScript.src = '/static/js/chat.js';
-            chatScript.onload = () => {
-              const vadScript = document.createElement('script');
-              vadScript.src = '/static/js/vad_init.js';
-              vadScript.onload = () => {
-                console.log('Voice system initialization complete');
-              };
-              vadScript.onerror = () => {
-                console.error('Failed to load VAD initializer');
-              };
-              document.head.appendChild(vadScript);
-            };
-            chatScript.onerror = () => {
-              console.error('Failed to load chat module');
-            };
-            document.head.appendChild(chatScript);
-          }
-        }
-      };
-
-      voiceModules.forEach(src => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => checkComplete(src, true);
-        script.onerror = () => {
-          console.error(`Failed to load voice module: ${src}`);
-          checkComplete(src, false);
-        };
-        document.head.appendChild(script);
-      });
-    }
-
-    // Start loading voice modules when Socket.IO is ready
-    waitForSocketIO(loadVoiceModules);
+    /* kick off once page parses */
+    loadVoiceWhenIOReady();
   </script>
 
-  <!-- Main app -->
+  <!-- 5️⃣  Main application bootstrap -->
   <script src="/static/js/app.js"></script>
 
-  <!-- Debug helper for production -->
+  <!-- 6️⃣  Debug helper -->
   <script>
-    // Add debug info for troubleshooting
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        console.log('Page load complete. Debug info:', {
-          socketIO: typeof io !== 'undefined',
-          realtimeController: typeof RealtimeController !== 'undefined',
-          vadProcessor: typeof VADProcessor !== 'undefined',
-          voiceStatus: document.getElementById('voice-status')?.style.display
-        });
-      }, 2000);
-    });
+    window.addEventListener('load', () =>
+      setTimeout(() => console.log('[DEBUG]', {
+        socketIO          : !!window.io,
+        realtimeController: !!window.RealtimeController,
+        vadProcessor      : !!window.VADProcessor
+      }), 2_000));
   </script>
-
 </body>
 </html>
