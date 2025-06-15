@@ -3,20 +3,20 @@
 
 class VADProcessor {
     constructor(options = {}) {
-        // VAD configuration
+        // VAD configuration - made more conservative
         this.sampleRate = options.sampleRate || 24000;
         this.frameSize = options.frameSize || 20; // ms
-        this.vadMode = options.vadMode || 3; // 0-3, higher = more aggressive
+        this.vadMode = options.vadMode || 1; // Changed from 3 to 1 (less aggressive)
         this.vadThreshold = options.vadThreshold || 0.5;
         
         // Calculate samples per frame
         this.samplesPerFrame = Math.floor(this.sampleRate * this.frameSize / 1000);
         
-        // Speech detection parameters
-        this.speechThreshold = options.speechThreshold || 0.015; // RMS threshold
+        // Speech detection parameters - made more conservative
+        this.speechThreshold = options.speechThreshold || 0.025; // Increased from 0.015
         this.silenceThreshold = options.silenceThreshold || 0.01;
         this.speechPadding = options.speechPadding || 300; // ms before speech
-        this.silenceDuration = options.silenceDuration || 500; // ms to detect end
+        this.silenceDuration = options.silenceDuration || 800; // Increased from 500ms
         
         // State tracking
         this.isSpeaking = false;
@@ -42,11 +42,18 @@ class VADProcessor {
         this.maxEnergyHistory = 50;
         this.noiseFloor = 0.01;
         
+        // Debouncing and stability
+        this.lastSpeechEvent = 0;
+        this.lastSilenceEvent = 0;
+        this.minEventInterval = 200; // Minimum time between events (ms)
+        
         console.log('VADProcessor initialized:', {
             sampleRate: this.sampleRate,
             frameSize: this.frameSize,
             samplesPerFrame: this.samplesPerFrame,
-            vadMode: this.vadMode
+            vadMode: this.vadMode,
+            speechThreshold: this.speechThreshold,
+            silenceDuration: this.silenceDuration
         });
     }
     
@@ -92,8 +99,8 @@ class VADProcessor {
         // Update energy history for adaptive threshold
         this._updateEnergyHistory(energy);
         
-        // Determine if frame contains speech
-        const isSpeech = this._detectSpeech(energy);
+        // Determine if frame contains speech - add minimum energy check
+        const isSpeech = energy > 0.005 && this._detectSpeech(energy); // Added minimum threshold
         
         // Create frame data including pre-buffer if needed
         const frameData = new Float32Array(frame);
@@ -101,14 +108,14 @@ class VADProcessor {
         // Update pre-buffer
         this._updatePreBuffer(frameData);
         
-        // Track speech/silence frames
+        // Track speech/silence frames with improved logic
         if (isSpeech) {
             this.speechFrames++;
             this.silenceFrames = 0;
             this.silenceStart = null;
             
-            // Check for speech start
-            if (!this.isSpeaking && this.speechFrames >= 3) { // 3 frames = 60ms
+            // Require more consecutive speech frames before triggering
+            if (!this.isSpeaking && this.speechFrames >= 5) { // Changed from 3 to 5 frames
                 this._handleSpeechStart();
             }
         } else {
@@ -119,14 +126,14 @@ class VADProcessor {
                     this.silenceStart = Date.now();
                 }
                 
-                // Check for speech end
+                // Check for speech end - require more silence frames
                 const silenceDuration = Date.now() - this.silenceStart;
-                if (silenceDuration >= this.silenceDuration) {
+                if (silenceDuration >= this.silenceDuration && this.silenceFrames >= 15) { // Added frame count requirement
                     this._handleSpeechEnd();
                 }
             } else {
-                // Reset speech frames if not speaking
-                this.speechFrames = 0;
+                // Gradual decay instead of immediate reset
+                this.speechFrames = Math.max(0, this.speechFrames - 1);
             }
         }
         
@@ -168,11 +175,11 @@ class VADProcessor {
         // Use adaptive threshold based on noise floor
         const adaptiveThreshold = Math.max(
             this.speechThreshold,
-            this.noiseFloor * 2.5
+            this.noiseFloor * 3.5 // Increased from 2.5 to 3.5
         );
         
-        // Apply VAD mode (higher modes are more aggressive)
-        const modeMultiplier = 1 + (this.vadMode * 0.2);
+        // Apply VAD mode (higher modes are more aggressive) - reduced sensitivity
+        const modeMultiplier = 1 + (this.vadMode * 0.15); // Reduced from 0.2 to 0.15
         const threshold = adaptiveThreshold * modeMultiplier;
         
         return energy > threshold;
@@ -192,7 +199,7 @@ class VADProcessor {
         // Update noise floor (use lower percentile of energy)
         if (this.energyHistory.length >= 10) {
             const sorted = [...this.energyHistory].sort((a, b) => a - b);
-            const percentileIndex = Math.floor(sorted.length * 0.1);
+            const percentileIndex = Math.floor(sorted.length * 0.15); // Increased from 0.1 to 0.15
             this.noiseFloor = sorted[percentileIndex];
         }
     }
@@ -214,11 +221,20 @@ class VADProcessor {
     }
     
     /**
-     * Handle speech start event
+     * Handle speech start event with debouncing
      * @private
      */
     _handleSpeechStart() {
+        const now = Date.now();
+        
+        // Debounce speech start events
+        if (now - this.lastSpeechEvent < this.minEventInterval) {
+            console.log('VAD: Speech start debounced');
+            return;
+        }
+        
         this.isSpeaking = true;
+        this.lastSpeechEvent = now;
         console.log('VAD: Speech started');
         
         if (this.onSpeechStart) {
@@ -226,27 +242,36 @@ class VADProcessor {
             const preBufferedAudio = this._getPreBufferedAudio();
             
             this.onSpeechStart({
-                timestamp: Date.now(),
+                timestamp: now,
                 preBufferedAudio
             });
         }
     }
     
     /**
-     * Handle speech end event
+     * Handle speech end event with debouncing
      * @private
      */
     _handleSpeechEnd() {
+        const now = Date.now();
+        
+        // Debounce speech end events
+        if (now - this.lastSilenceEvent < this.minEventInterval) {
+            console.log('VAD: Speech end debounced');
+            return;
+        }
+        
         this.isSpeaking = false;
         this.speechFrames = 0;
         this.silenceFrames = 0;
         this.silenceStart = null;
+        this.lastSilenceEvent = now;
         
         console.log('VAD: Speech ended');
         
         if (this.onSpeechEnd) {
             this.onSpeechEnd({
-                timestamp: Date.now()
+                timestamp: now
             });
         }
     }
@@ -303,6 +328,8 @@ class VADProcessor {
         this.frameBufferIndex = 0;
         this.energyHistory = [];
         this.noiseFloor = 0.01;
+        this.lastSpeechEvent = 0;
+        this.lastSilenceEvent = 0;
         
         console.log('VAD: Reset');
     }
@@ -313,15 +340,18 @@ class VADProcessor {
     updateParams(params) {
         if (params.speechThreshold !== undefined) {
             this.speechThreshold = params.speechThreshold;
+            console.log('VAD: Speech threshold updated to', this.speechThreshold);
         }
         if (params.silenceThreshold !== undefined) {
             this.silenceThreshold = params.silenceThreshold;
         }
         if (params.silenceDuration !== undefined) {
             this.silenceDuration = params.silenceDuration;
+            console.log('VAD: Silence duration updated to', this.silenceDuration);
         }
         if (params.vadMode !== undefined) {
             this.vadMode = Math.max(0, Math.min(3, params.vadMode));
+            console.log('VAD: Mode updated to', this.vadMode);
         }
         
         console.log('VAD: Parameters updated', params);
@@ -336,7 +366,30 @@ class VADProcessor {
             speechFrames: this.speechFrames,
             silenceFrames: this.silenceFrames,
             noiseFloor: this.noiseFloor,
-            preBufferSize: this.preBuffer.length
+            preBufferSize: this.preBuffer.length,
+            lastSpeechEvent: this.lastSpeechEvent,
+            lastSilenceEvent: this.lastSilenceEvent
+        };
+    }
+    
+    /**
+     * Get debug information
+     */
+    getDebugInfo() {
+        return {
+            config: {
+                sampleRate: this.sampleRate,
+                frameSize: this.frameSize,
+                vadMode: this.vadMode,
+                speechThreshold: this.speechThreshold,
+                silenceDuration: this.silenceDuration
+            },
+            state: this.getState(),
+            energyStats: {
+                historyLength: this.energyHistory.length,
+                noiseFloor: this.noiseFloor,
+                currentEnergy: this.energyHistory[this.energyHistory.length - 1] || 0
+            }
         };
     }
 }
