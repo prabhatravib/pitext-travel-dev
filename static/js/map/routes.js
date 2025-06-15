@@ -12,7 +12,7 @@
         console.error('Google Maps API not fully loaded yet for routes.js - retrying...');
         setTimeout(function() {
             const script = document.createElement('script');
-            script.src = '/travel/static/js/map/routes.js';
+            script.src = '/static/js/map/routes.js';
             document.head.appendChild(script);
         }, 100);
         return;

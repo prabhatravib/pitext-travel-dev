@@ -53,10 +53,12 @@ socketio = SocketIO(
 logger.info("Socket.IO initialised (async_mode=threading)")
 
 # Try to load blueprints and websocket handlers
+# Try to load blueprints and websocket handlers
 blueprint_loaded = False
+travel_bp = None
 try:
-    from routes.travel import create_travel_blueprint
-    from routes.websocket import register_websocket_handlers
+    from pitext_travel.routes.travel import create_travel_blueprint
+    from pitext_travel.routes.websocket import register_websocket_handlers
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
     travel_bp = create_travel_blueprint(base_dir)
@@ -75,32 +77,30 @@ except Exception as e:
 # Routes
 @app.route("/")
 def index():
-    """Root route"""
-    if blueprint_loaded:
-        try:
-            return redirect(url_for('travel.index'))
-        except:
-            pass
     
-    # Fallback: serve template directly
-    try:
-        return render_template('map.html')
-    except Exception as e:
-        logger.error(f"Template error: {e}")
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>PiText Travel</title></head>
-        <body>
-            <h1>PiText Travel Service</h1>
-            <p>The service is running but some components failed to load.</p>
-            <p>Error: {str(e)}</p>
-            <p>Check the logs for more details.</p>
-        </body>
-        </html>
-        """
-
-@app.route("/health")
+    """Root route"""
+    if blueprint_loaded and travel_bp:
+        # Serve the map template directly
+        try:
+            template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+            app.template_folder = template_path
+            return render_template('map.html')
+        except Exception as e:
+            logger.error(f"Template error: {e}")
+    
+    # Fallback: serve simple HTML
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head><title>PiText Travel</title></head>
+    <body>
+        <h1>PiText Travel Service</h1>
+        <p>The service is running but some components failed to load.</p>
+        <p>Blueprint loaded: {blueprint_loaded}</p>
+        <p>Check the logs for more details.</p>
+    </body>
+    </html>
+    """@app.route("/health")
 def health():
     """Health check endpoint"""
     return {"status": "ok", "blueprint_loaded": blueprint_loaded}

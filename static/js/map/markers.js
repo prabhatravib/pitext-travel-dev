@@ -14,7 +14,7 @@
         setTimeout(function() {
             // Retry loading this script
             const script = document.createElement('script');
-            script.src = '/travel/static/js/map/markers.js';
+            script.src = '/static/ js/map/markers.js';
             document.head.appendChild(script);
         }, 100);
         return;
@@ -177,7 +177,7 @@ function showPOIs(list) {
       title: name,
       map,
       icon: {
-        url: '/travel/static/img/poi.svg',
+        url: '/static/ img/poi.svg',
         scaledSize: new google.maps.Size(28, 28)
       }
     });

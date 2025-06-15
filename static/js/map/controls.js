@@ -9,7 +9,7 @@
         console.error('Google Maps API not fully loaded yet for controls.js - retrying...');
         setTimeout(function() {
             const script = document.createElement('script');
-            script.src = '/travel/static/js/map/controls.js';
+            script.src = '/static/js/map/controls.js';
             document.head.appendChild(script);
         }, 100);
         return;
