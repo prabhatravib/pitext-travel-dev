@@ -128,10 +128,13 @@ class RealtimeClient:
         self._send_event(event)
 
     
+# pitext_travel/api/realtime/client.py
     def commit_audio(self):
-        """Commit the audio buffer for processing."""
-        event = {"type": "input_audio_buffer.commit"}
-        self._send_event(event)
+        """Freeze the current input buffer and ask the model to reply."""
+        # 1) tell OpenAI we’re done collecting audio
+        self._send_event({"type": "input_audio_buffer.commit"})
+        # 2) immediately request a response
+        self._send_event({"type": "response.create"})
     
     def clear_audio_buffer(self):
         """Clear the input audio buffer."""
