@@ -1,6 +1,8 @@
 """
-PiText-Travel – main application entry point
+PiText-Travel - main application entry point
 """
+import eventlet
+eventlet.monkey_patch()
 
 import logging
 import os
@@ -55,12 +57,12 @@ CORS(app, origins="*", supports_credentials=True)
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="threading",
+    async_mode="eventlet",
     logger=True,
     engineio_logger=False
     #path="travel/socket.io",
 )
-logger.info("Socket.IO initialised (async_mode=threading)")
+logger.info("Socket.IO initialised (async_mode=eventlet)")
 
 # ------------------------------------------------------------------------------
 # Load blueprint + websocket handlers
