@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from pitext_travel.routes.websocket import socketio, NAMESPACE
 
 # ------------------------------------------------------------------------------
 # Environment & logging
