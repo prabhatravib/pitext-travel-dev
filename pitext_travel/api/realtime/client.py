@@ -98,6 +98,18 @@ class RealtimeClient:
             if self.ws_thread and self.ws_thread.is_alive():
                 self.ws_thread.join(timeout=2.0)
     
+    def _send_event(self, event: Dict[str, Any]):
+        """Send event to OpenAI Realtime API."""
+        if self.is_connected and self.ws:
+            try:
+                self.ws.send(json.dumps(event))
+                logger.debug(f"Sent event: {event['type']}")
+            except Exception as e:
+                logger.error(f"Failed to send event: {e}")
+                if self.on_error:
+                    self.on_error(f"Failed to send event: {e}")
+
+    
     def send_audio(self, audio_data: bytes):
         """Send audio data to OpenAI."""
         if not self.is_connected:
@@ -114,6 +126,7 @@ class RealtimeClient:
         }
         
         self._send_event(event)
+
     
     def commit_audio(self):
         """Commit the audio buffer for processing."""
@@ -178,16 +191,7 @@ class RealtimeClient:
         }
         
         self._send_event(session_update)
-        def _send_event(self, event: Dict[str, Any]):
-            """Send event to OpenAI Realtime API."""
-            if self.is_connected and self.ws:
-                try:
-                    self.ws.send(json.dumps(event))
-                    logger.debug(f"Sent event: {event['type']}")
-                except Exception as e:
-                    logger.error(f"Failed to send event: {e}")
-                    if self.on_error:
-                        self.on_error(f"Failed to send event: {e}")
+
     
     def _on_open(self, ws):
         """Handle WebSocket connection opened."""
