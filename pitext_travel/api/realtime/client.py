@@ -118,7 +118,7 @@ class RealtimeClient:
         
         # OpenAI expects base64 encoded audio in events
         import base64
-        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        audio_base64 = base64.b64encode(audio_data).decode('ascii')
         
         event = {
             "type": "input_audio_buffer.append",
@@ -195,18 +195,31 @@ class RealtimeClient:
         
         self._send_event(session_update)
 
-    
-    def _on_open(self, ws):
-        """Handle WebSocket connection opened."""
-        logger.info(f"Realtime API connection established for session {self.session_id}")
+    def _on_open(self):
+        # 1) Create the realtime session, declaring audio I/O formats
+        self._send_event({
+            "type": "session.create",
+            "input_audio_format": {
+                "type": "pcm16",
+                "sample_rate": 24000
+            },
+            "output_audio_format": {
+                "type": "wav"
+            }
+        })
+
+        # 2) Log that the websocket is connected
+        logger.info(
+            f"Realtime API connection established for session {self.session_id}"
+        )
         self.is_connected = True
-        
-        # Send initial session configuration
+
+        # 3) Send your initial chat instructions & parameters
         self.update_session(
             instructions=self.config["instructions"],
             temperature=self.config["temperature"]
         )
-    
+ 
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages."""
         try:

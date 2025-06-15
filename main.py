@@ -59,7 +59,7 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="eventlet",
     logger=True,
-    engineio_logger=False
+    engineio_logger=True  
     #path="travel/socket.io",
 )
 logger.info("Socket.IO initialised (async_mode=eventlet)")
@@ -129,13 +129,13 @@ def test_socketio():
       <h1>Socket.IO Connection Test</h1>
       <div id="status">Connecting...</div>
       <div id="log"></div>
-      <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+      <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
       <script>
         const status = document.getElementById('status');
         const log    = document.getElementById('log');
         function add(msg){ log.innerHTML += `<p>${new Date().toISOString()}: ${msg}</p>`; }
 
-        const socket = io('/travel/ws', { path: '/socket.io/' });
+        const socket = io('/travel/ws', { path: '/socket.io' });
 
         socket.on('connect',        ()  => { status.textContent = '✅ Connected';  add('Connected'); });
         socket.on('disconnect',   r   => { status.textContent = `❌ Disconnect: ${r}`; add(`Disconnect: ${r}`); });

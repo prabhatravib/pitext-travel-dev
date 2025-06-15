@@ -70,7 +70,7 @@
       trySrc('/socket.io/socket.io.js', ok => {
         if (ok) return console.log('[IO] loaded locally');
         console.warn('[IO] local failed – trying CDN');
-        trySrc('https://cdn.socket.io/4.7.2/socket.io.min.js', ok2 => {
+        trySrc('https://cdn.socket.io/4.7.4/socket.io.min.js', ok2 => {
           if (!ok2) {
             console.error('[IO] failed everywhere – voice disabled');
             document.getElementById('voice-status').style.display = 'none';
