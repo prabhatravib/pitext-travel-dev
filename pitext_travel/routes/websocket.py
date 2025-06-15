@@ -1,178 +1,234 @@
 # pitext_travel/routes/websocket.py
-"""WebSocket route handlers for Realtime API integration."""
+"""
+WebSocket route handlers for Realtime API integration.
+"""
 
+import base64
 import logging
-import json
-from flask import session, request
-from flask_socketio import emit, disconnect, join_room, leave_room
-from typing import Optional
 import time
+from typing import Optional, Callable
 
-# Configure logging
+from flask import request, session
+from flask_socketio import emit, disconnect
+
 logger = logging.getLogger(__name__)
 
-def register_websocket_handlers(socketio):
-    """Register WebSocket event handlers with SocketIO.
-    
-    Args:
-        socketio: Flask-SocketIO instance
+
+# --------------------------------------------------------------------------- #
+# Helper: bridge Realtime-API callbacks → Socket.IO events                    #
+# --------------------------------------------------------------------------- #
+def _wire_realtime_callbacks(
+    socketio, realtime_session, sid: str, namespace: str = "/travel/ws"
+) -> None:
     """
-    
-    logger.info("Registering WebSocket handlers...")
-    
-    @socketio.on('connect', namespace='/travel/ws')
-    def handle_connect(auth):
-        """Handle WebSocket connection from browser."""
-        user_ip = request.remote_addr
-        origin = request.headers.get('Origin', 'unknown')
-        
-        logger.info(f"WebSocket connected from {user_ip}, origin: {origin}")
-        
+    Attach handlers so that audio and transcript updates coming from
+    `RealtimeClient` get streamed back to the browser in real-time.
+    """
+    client = realtime_session.client
+    if client is None:  # should not happen after activation
+        return
+
+    # -- audio ----------------------------------------------------------------
+    def _on_audio_chunk(chunk: bytes, item_id: Optional[str] = None) -> None:
         try:
-            # Import here to avoid circular imports
+            socketio.emit(
+                "audio_chunk",
+                {
+                    "audio": base64.b64encode(chunk).decode(),
+                    "item_id": item_id,
+                },
+                room=sid,
+                namespace=namespace,
+                binary=False,  # payload already base64
+            )
+        except Exception as exc:
+            logger.exception("Failed emitting audio_chunk: %s", exc)
+
+    # -- transcript -----------------------------------------------------------
+    def _on_transcript(text: str, item_id: Optional[str], is_final: bool) -> None:
+        try:
+            socketio.emit(
+                "transcript",
+                {
+                    "text": text,
+                    "item_id": item_id,
+                    "is_final": is_final,
+                },
+                room=sid,
+                namespace=namespace,
+            )
+        except Exception as exc:
+            logger.exception("Failed emitting transcript: %s", exc)
+
+    client.on_audio_chunk = _on_audio_chunk
+    client.on_transcript = _on_transcript
+    # You can also wire: client.on_error, client.on_session_update, …
+
+
+# --------------------------------------------------------------------------- #
+# Public API: register all WebSocket handlers                                 #
+# --------------------------------------------------------------------------- #
+def register_websocket_handlers(socketio) -> None:
+    """Attach every Socket.IO event handler for the *travel* namespace."""
+    logger.info("Registering WebSocket handlers…")
+
+    NAMESPACE = "/travel/ws"
+
+    # ------------------------------ CONNECT ---------------------------------- #
+    @socketio.on("connect", namespace=NAMESPACE)
+    def handle_connect(auth):  # noqa: ANN001
+        user_ip = request.remote_addr
+        origin = request.headers.get("Origin", "unknown")
+        logger.info("WebSocket connected from %s (origin: %s)", user_ip, origin)
+
+        try:
+            # Lazy import avoids circulars
             from pitext_travel.api.realtime.session_manager import get_session_manager
-            
-            # Create session ID from Flask session
-            flask_sid = session.get('_id', 'anonymous')
-            
-            # Create or get existing Realtime session
+
+            flask_sid = session.get("_id", "anonymous")
             manager = get_session_manager()
+
             realtime_session = manager.get_session_by_flask_id(flask_sid)
-            
-            if not realtime_session:
+            if realtime_session is None:
                 realtime_session = manager.create_session(user_ip, flask_sid)
-                
-                if not realtime_session:
-                    logger.error("Failed to create realtime session - rate limited")
-                    emit('error', {'message': 'Rate limit exceeded or server at capacity'})
+                if realtime_session is None:  # rate-limited or at capacity
+                    emit(
+                        "error",
+                        {
+                            "message": "Rate limit exceeded or server at capacity"
+                        },
+                    )
                     disconnect()
                     return
-            
-            # Store session ID in SocketIO session
-            session['realtime_session_id'] = realtime_session.session_id
-            
-            logger.info(f"Session created: {realtime_session.session_id}")
-            
-            emit('connected', {
-                'session_id': realtime_session.session_id,
-                'status': 'connected'
-            })
-            
-        except Exception as e:
-            logger.error(f"Error in connect handler: {e}")
-            emit('error', {'message': 'Connection failed'})
+
+            session["realtime_session_id"] = realtime_session.session_id
+
+            logger.info("Session created: %s", realtime_session.session_id)
+            emit(
+                "connected",
+                {
+                    "session_id": realtime_session.session_id,
+                    "status": "connected",
+                },
+            )
+        except Exception as exc:  # pragma: no cover
+            logger.exception("Error in connect handler: %s", exc)
+            emit("error", {"message": "Connection failed"})
             disconnect()
-    @socketio.on('start_session', namespace='/travel/ws')
-    def handle_start_session(data):
-        """Start a Realtime API session."""
-        session_id = session.get('realtime_session_id')
-        
-        if not session_id:
-            emit('error', {'message': 'No session available'})
-            return
-        
-        try:
-            from pitext_travel.api.realtime.session_manager import get_session_manager
-            manager = get_session_manager()
-            realtime_session = manager.get_session(session_id)
-            
-            if realtime_session:
-                # Activate the session (connect to OpenAI)
-                if manager.activate_session(session_id):
-                    emit('session_started', {
-                        'session_id': session_id,
-                        'status': 'active'
-                    })
-                else:
-                    emit('error', {'message': 'Failed to activate session'})
-            else:
-                emit('error', {'message': 'Session not found'})
-                
-        except Exception as e:
-            logger.error(f"Error starting session: {e}")
-            emit('error', {'message': 'Failed to start session'})
 
-    @socketio.on('audio_data', namespace='/travel/ws')
-    def handle_audio_data(data):
-        """Handle audio data from client."""
-        session_id = session.get('realtime_session_id')
-        
+    # -------------------------- START REALTIME SESSION ----------------------- #
+    @socketio.on("start_session", namespace=NAMESPACE)
+    def handle_start_session(data):  # noqa: ANN001
+        session_id = session.get("realtime_session_id")
         if not session_id:
-            emit('error', {'message': 'No session available'})
+            emit("error", {"message": "No session available"})
             return
-        
+
         try:
             from pitext_travel.api.realtime.session_manager import get_session_manager
+
             manager = get_session_manager()
             realtime_session = manager.get_session(session_id)
-            
+            if realtime_session is None:
+                emit("error", {"message": "Session not found"})
+                return
+
+            # Activate (ie, open WS to the OpenAI Realtime API)
+            if not manager.activate_session(session_id):
+                emit("error", {"message": "Failed to activate session"})
+                return
+
+            # Bridge callbacks → browser
+            _wire_realtime_callbacks(socketio, realtime_session, request.sid, NAMESPACE)
+
+            emit(
+                "session_started",
+                {
+                    "session_id": session_id,
+                    "status": "active",
+                },
+            )
+            logger.info("Realtime session %s started", session_id)
+
+        except Exception as exc:
+            logger.exception("Error starting session: %s", exc)
+            emit("error", {"message": "Failed to start session"})
+
+    # ----------------------------- AUDIO DATA -------------------------------- #
+    @socketio.on("audio_data", namespace=NAMESPACE)
+    def handle_audio_data(data):  # noqa: ANN001
+        session_id = session.get("realtime_session_id")
+        if session_id is None:
+            emit("error", {"message": "No session available"})
+            return
+
+        try:
+            from pitext_travel.api.realtime.session_manager import get_session_manager
+
+            manager = get_session_manager()
+            realtime_session = manager.get_session(session_id)
             if realtime_session and realtime_session.client:
-                audio_data = data.get('audio')
-                if audio_data:
-                    import base64
-                    audio_bytes = base64.b64decode(audio_data)
-                    realtime_session.client.send_audio(audio_bytes)
-                    
-                    # Update stats
-                    manager.update_session_stats(session_id, audio_sent=len(audio_bytes))
-                    
-        except Exception as e:
-            logger.error(f"Error handling audio data: {e}")
-            emit('error', {'message': 'Failed to process audio'})
+                audio_b64 = data.get("audio")
+                if not audio_b64:
+                    return
+                audio_bytes = base64.b64decode(audio_b64)
+                realtime_session.client.send_audio(audio_bytes)
+                manager.update_session_stats(session_id, audio_sent=len(audio_bytes))
+        except Exception as exc:
+            logger.exception("Error handling audio data: %s", exc)
+            emit("error", {"message": "Failed to process audio"})
 
-    @socketio.on('commit_audio', namespace='/travel/ws')
+    # ------------------------------ COMMIT AUDIO ----------------------------- #
+    @socketio.on("commit_audio", namespace=NAMESPACE)
     def handle_commit_audio():
-        """Commit audio buffer for processing."""
-        session_id = session.get('realtime_session_id')
-        
-        if session_id:
-            try:
-                from pitext_travel.api.realtime.session_manager import get_session_manager
-                manager = get_session_manager()
-                realtime_session = manager.get_session(session_id)
-                
-                if realtime_session and realtime_session.client:
-                    realtime_session.client.commit_audio()
-                    
-            except Exception as e:
-                logger.error(f"Error committing audio: {e}")
+        session_id = session.get("realtime_session_id")
+        if session_id is None:
+            return
 
-    @socketio.on('interrupt', namespace='/travel/ws')
+        try:
+            from pitext_travel.api.realtime.session_manager import get_session_manager
+
+            realtime_session = get_session_manager().get_session(session_id)
+            if realtime_session and realtime_session.client:
+                realtime_session.client.commit_audio()
+        except Exception as exc:
+            logger.exception("Error committing audio: %s", exc)
+
+    # ------------------------------- INTERRUPT ------------------------------- #
+    @socketio.on("interrupt", namespace=NAMESPACE)
     def handle_interrupt():
-        """Handle user interrupt (barge-in)."""
-        session_id = session.get('realtime_session_id')
-        
-        if session_id:
-            try:
-                from pitext_travel.api.realtime.session_manager import get_session_manager
-                manager = get_session_manager()
-                realtime_session = manager.get_session(session_id)
-                
-                if realtime_session and realtime_session.client:
-                    realtime_session.client.interrupt()
-                    emit('interrupted', {'status': 'interrupted'})
-                    
-            except Exception as e:
-                logger.error(f"Error handling interrupt: {e}")
-    @socketio.on('disconnect', namespace='/travel/ws')
+        session_id = session.get("realtime_session_id")
+        if session_id is None:
+            return
+
+        try:
+            from pitext_travel.api.realtime.session_manager import get_session_manager
+
+            realtime_session = get_session_manager().get_session(session_id)
+            if realtime_session and realtime_session.client:
+                realtime_session.client.interrupt()
+                emit("interrupted", {"status": "interrupted"})
+        except Exception as exc:
+            logger.exception("Error handling interrupt: %s", exc)
+
+    # ------------------------------ DISCONNECT ------------------------------- #
+    @socketio.on("disconnect", namespace=NAMESPACE)
     def handle_disconnect():
-        """Handle WebSocket disconnection."""
-        session_id = session.get('realtime_session_id')
-        
-        if session_id:
-            try:
-                from pitext_travel.api.realtime.session_manager import get_session_manager
-                manager = get_session_manager()
-                manager.deactivate_session(session_id, 'client_disconnect')
-                logger.info(f"WebSocket disconnected, session {session_id} deactivated")
-            except Exception as e:
-                logger.error(f"Error in disconnect handler: {e}")
-    
-    @socketio.on('ping', namespace='/travel/ws')
+        session_id = session.get("realtime_session_id")
+        if session_id is None:
+            return
+        try:
+            from pitext_travel.api.realtime.session_manager import get_session_manager
+
+            get_session_manager().deactivate_session(session_id, "client_disconnect")
+            logger.info("WebSocket disconnected, session %s deactivated", session_id)
+        except Exception as exc:
+            logger.exception("Error in disconnect handler: %s", exc)
+
+    # --------------------------------- PING ---------------------------------- #
+    @socketio.on("ping", namespace=NAMESPACE)
     def handle_ping():
-        """Handle ping for connection testing."""
-        emit('pong', {'timestamp': time.time()})
-    
-    # Add more handlers as needed...
-    
+        """Simple ping/pong to keep the connection alive."""
+        emit("pong", {"timestamp": time.time()})
+
     logger.info("WebSocket handlers registered successfully")
