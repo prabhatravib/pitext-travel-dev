@@ -34,7 +34,7 @@ def generate_trip_itinerary(city, days=3):
             "Focus on must-see attractions, museums, landmarks, and popular areas. "
             "Keep each day to 3-4 stops maximum for a comfortable pace. "
             "Return ONLY a JSON object with this exact structure: "
-            '{"days":[{"label":"Day 1","color":"#ff6b6b","stops":[{"name":"Exact Place Name"}]}]}'
+            '{"days":[{"label":"Day 1","stops":[{"name":"Exact Place Name"}]}]}'
         )
         
         user_prompt = (

@@ -61,35 +61,36 @@ def _wire_realtime_callbacks(
         except Exception as exc:
             logger.exception("Failed emitting transcript: %s", exc)
 
-    # -- function calls -------------------------------------------------------
     def _on_function_call(call_id: str, name: str, args: dict) -> None:
         try:
             logger.info(f"Received function call: {name} with args: {args}")
-            
-            # Get the function handler
+
             if hasattr(realtime_session, 'function_handler'):
                 result = realtime_session.function_handler.handle_function_call(
                     call_id, name, args
                 )
-                
-                # Send result back to Realtime API
-                realtime_session.client.send_function_result(call_id, result)
-                
-                # If it's a trip planning result, emit to frontend
-                if name == "plan_trip" and result.get("success"):
-                    logger.info("Emitting render_itinerary event to frontend")
-                    socketio.emit(
-                        "render_itinerary",
-                        {
-                            "itinerary": result.get("itinerary"),
-                            "city": result.get("city"),
-                            "days": result.get("days")
-                        },
-                        room=sid,
-                        namespace=namespace
-                    )
+
+                # Handle trip planning
+                if name == "plan_trip":
+                    if result.get("success") and result.get("itinerary"):
+                        logger.info(f"✅ Emitting render_itinerary for {result.get('city')} ({result.get('days')} days)")
+                        socketio.emit(
+                            "render_itinerary",
+                            {
+                                "itinerary": result["itinerary"],
+                                "city": result["city"],
+                                "days": result["days"]
+                            },
+                            room=sid,
+                            namespace=namespace
+                        )
+                    else:
+                        logger.warning(f"❌ Failed to generate itinerary for args={args}, result={result}")
+                    # Send result back to OpenAI regardless
+                    realtime_session.client.send_function_result(call_id, result)
+
+                # Handle itinerary explanation (overview or day-specific)
                 elif name == "explain_day" and result.get("needs_session_data"):
-                    # Handle explain_day which needs session data
                     flask_session = session
                     if 'current_itinerary' in flask_session:
                         voice_response = realtime_session.function_handler.format_explain_day_response(
@@ -97,18 +98,23 @@ def _wire_realtime_callbacks(
                             flask_session.get('current_city', 'your destination'),
                             result.get('day_number', 0)
                         )
-                        
-                        # Update the result with the formatted response
                         result['voice_response'] = voice_response
-                        
-                        # Send updated result back
-                        realtime_session.client.send_function_result(call_id, result)
+                    else:
+                        result['voice_response'] = "I don't have an itinerary to explain. Would you like to plan one first?"
+
+                    realtime_session.client.send_function_result(call_id, result)
+
             else:
-                logger.error(f"No function handler available for session {realtime_session.session_id}")
-                
+                logger.error(f"No function handler found for session {realtime_session.session_id}")
+                realtime_session.client.send_function_result(call_id, {
+                    "success": False,
+                    "error": "Function handler not available",
+                    "call_id": call_id,
+                    "function": name
+                })
+
         except Exception as exc:
-            logger.exception("Failed handling function call: %s", exc)
-            # Send error result back to Realtime API
+            logger.exception("Failed handling function call:")
             error_result = {
                 "success": False,
                 "error": str(exc),
@@ -116,38 +122,37 @@ def _wire_realtime_callbacks(
                 "function": name
             }
             realtime_session.client.send_function_result(call_id, error_result)
+        # -- error handling -------------------------------------------------------
+        def _on_error(error: str) -> None:
+            try:
+                logger.error(f"Realtime API error: {error}")
+                socketio.emit(
+                    "error",
+                    {"message": error},
+                    room=sid,
+                    namespace=namespace,
+                )
+            except Exception as exc:
+                logger.exception("Failed emitting error: %s", exc)
 
-    # -- error handling -------------------------------------------------------
-    def _on_error(error: str) -> None:
-        try:
-            logger.error(f"Realtime API error: {error}")
-            socketio.emit(
-                "error",
-                {"message": error},
-                room=sid,
-                namespace=namespace,
-            )
-        except Exception as exc:
-            logger.exception("Failed emitting error: %s", exc)
+        # -- session updates ------------------------------------------------------
+        def _on_session_update(session_data: dict) -> None:
+            try:
+                socketio.emit(
+                    "session_update",
+                    session_data,
+                    room=sid,
+                    namespace=namespace,
+                )
+            except Exception as exc:
+                logger.exception("Failed emitting session_update: %s", exc)
 
-    # -- session updates ------------------------------------------------------
-    def _on_session_update(session_data: dict) -> None:
-        try:
-            socketio.emit(
-                "session_update",
-                session_data,
-                room=sid,
-                namespace=namespace,
-            )
-        except Exception as exc:
-            logger.exception("Failed emitting session_update: %s", exc)
-
-    # Wire up all callbacks
-    client.on_audio_chunk = _on_audio_chunk
-    client.on_transcript = _on_transcript
-    client.on_function_call = _on_function_call
-    client.on_error = _on_error
-    client.on_session_update = _on_session_update
+        # Wire up all callbacks
+        client.on_audio_chunk = _on_audio_chunk
+        client.on_transcript = _on_transcript
+        client.on_function_call = _on_function_call
+        client.on_error = _on_error
+        client.on_session_update = _on_session_update
 
 
 # --------------------------------------------------------------------------- #

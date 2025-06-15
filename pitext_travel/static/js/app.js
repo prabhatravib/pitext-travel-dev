@@ -58,7 +58,6 @@ function initializeWebSocket() {
     }
     
     
-    // ... rest of the function remains the same    
     // Check if Realtime module is loaded
     if (!window.RealtimeController) {
         debugLog("Realtime module not loaded yet, deferring WebSocket init");
@@ -317,6 +316,22 @@ window.addEventListener('error', function (e) {
         `);
     }
 }, true);
+
+import { getColourForDay } from '/static/dayColors.js';
+
+// Example adjusted frontend itinerary processing
+async function processItinerary(city, days) {
+    const itinerary = await fetchItinerary(city, days);
+
+    // Assign colors dynamically from dayColors.js
+    itinerary.days.forEach((day, index) => {
+        day.color = getColourForDay(index + 1);
+    });
+
+    // Proceed to render on the map
+    renderTripOnMap(itinerary);
+}
+
 
 // Export for other modules
 window.TravelApp = {
