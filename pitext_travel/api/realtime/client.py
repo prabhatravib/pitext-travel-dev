@@ -150,10 +150,9 @@ class RealtimeClient:
         if self.is_model_speaking:
             event = {"type": "response.cancel"}
             self._send_event(event)
-    
     def update_session(self, instructions: Optional[str] = None, 
-                      functions: Optional[list] = None,
-                      temperature: Optional[float] = None):
+                    functions: Optional[list] = None,
+                    temperature: Optional[float] = None):
         """Update session configuration."""
         session_update = {"type": "session.update", "session": {}}
         
@@ -161,14 +160,13 @@ class RealtimeClient:
             session_update["session"]["instructions"] = instructions
             
         if functions:
-            session_update["session"]["tools"] = [
-                {"type": "function", "function": func} for func in functions
-            ]
+            # Functions are already in the correct format from function_handler
+            session_update["session"]["tools"] = functions
             
         if temperature is not None:
             session_update["session"]["temperature"] = temperature
-            
-        # Always include model configuration
+        
+    # Always include model configuration
         session_update["session"]["voice"] = self.config["voice"]
         session_update["session"]["input_audio_format"] = self.config["audio_format"]["input"]
         session_update["session"]["output_audio_format"] = self.config["audio_format"]["output"]
@@ -180,17 +178,16 @@ class RealtimeClient:
         }
         
         self._send_event(session_update)
-    
-    def _send_event(self, event: Dict[str, Any]):
-        """Send event to OpenAI Realtime API."""
-        if self.is_connected and self.ws:
-            try:
-                self.ws.send(json.dumps(event))
-                logger.debug(f"Sent event: {event['type']}")
-            except Exception as e:
-                logger.error(f"Failed to send event: {e}")
-                if self.on_error:
-                    self.on_error(f"Failed to send event: {e}")
+        def _send_event(self, event: Dict[str, Any]):
+            """Send event to OpenAI Realtime API."""
+            if self.is_connected and self.ws:
+                try:
+                    self.ws.send(json.dumps(event))
+                    logger.debug(f"Sent event: {event['type']}")
+                except Exception as e:
+                    logger.error(f"Failed to send event: {e}")
+                    if self.on_error:
+                        self.on_error(f"Failed to send event: {e}")
     
     def _on_open(self, ws):
         """Handle WebSocket connection opened."""

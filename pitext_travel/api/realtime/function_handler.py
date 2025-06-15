@@ -28,9 +28,10 @@ class FunctionHandler:
             "explain_day": self._handle_explain_day
         }
         
-        # Function definitions for Realtime API
+    # Function definitions for Realtime API
         self.function_definitions = [
             {
+                "type": "function",
                 "name": "plan_trip",
                 "description": "Plan a multi-day itinerary for a city. Use this when the user provides BOTH a city name AND number of days.",
                 "parameters": {
@@ -51,6 +52,7 @@ class FunctionHandler:
                 }
             },
             {
+                "type": "function",
                 "name": "explain_day",
                 "description": "Explain the itinerary for a specific day or provide an overview of all days",
                 "parameters": {
@@ -65,8 +67,8 @@ class FunctionHandler:
                     "required": ["day_number"]
                 }
             }
-        ]
-    
+        ]    
+        
     def handle_function_call(self, call_id: str, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle a function call from the Realtime API.
         
