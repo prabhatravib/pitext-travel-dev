@@ -286,7 +286,6 @@ def register_websocket_handlers(socketio) -> None:
             logger.exception("Error handling audio data: %s", exc)
             emit("error", {"message": "Failed to process audio"})
 
-    # ------------------------------ COMMIT AUDIO ----------------------------- #
     @socketio.on("commit_audio", namespace=NAMESPACE)
     def handle_commit_audio():
         session_id = session.get("realtime_session_id")
@@ -295,14 +294,16 @@ def register_websocket_handlers(socketio) -> None:
 
         try:
             from pitext_travel.api.realtime.session_manager import get_session_manager
+            manager = get_session_manager()
 
-            realtime_session = get_session_manager().get_session(session_id)
+            realtime_session = manager.get_session(session_id)
             if realtime_session and realtime_session.client:
                 realtime_session.client.commit_audio()
-                logger.debug(f"Audio committed for session {session_id}")
+                logger.info(f"Audio committed for session {session_id}")  # Changed from debug to info
+                emit("audio_committed", {"status": "committed"})  # Add confirmation
         except Exception as exc:
             logger.exception("Error committing audio: %s", exc)
-
+            
     # ------------------------------- INTERRUPT ------------------------------- #
     @socketio.on("interrupt", namespace=NAMESPACE)
     def handle_interrupt():
