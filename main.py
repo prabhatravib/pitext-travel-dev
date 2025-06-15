@@ -58,7 +58,7 @@ socketio = SocketIO(
     async_mode="threading",
     logger=True,
     engineio_logger=False,
-    path="socket.io/",
+    path="travel/socket.io",
 )
 logger.info("Socket.IO initialised (async_mode=threading)")
 
