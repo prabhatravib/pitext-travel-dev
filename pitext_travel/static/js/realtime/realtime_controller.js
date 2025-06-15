@@ -4,10 +4,8 @@
 // -------------------------------------------------------------
 
 // ─── Module imports ───────────────────────────────────────────
-import { AudioCapture }       from './audio_capture.js';
-import { AudioPlayer }        from './audio_player.js';
-import { WebSocketClient }    from './websocket_client.js';
-import { VoiceStateMachine }  from './voice_state_machine.js';
+if (!window.AudioCapture || !window.AudioPlayer || !window.WebSocketClient || !window.VoiceStateMachine) {
+  console.error('RealtimeController dependencies not loaded');
 
 // ─── Class definition ─────────────────────────────────────────
 class RealtimeController {
