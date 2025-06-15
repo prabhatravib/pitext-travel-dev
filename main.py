@@ -4,7 +4,7 @@ PiText‑Travel – main application entry point
 * Flask app + Socket.IO 5 exposed as an **ASGI** application so it can be mounted
   by the root monorepo service that already runs under Uvicorn.
 * No eventlet/gevent required. Everything runs on the default asyncio loop.
-* The Socket.IO path is `/travel/socket.io/`, which must be used by the
+* The Socket.IO path is `/socket.io/`, which must be used by the
   JavaScript client.
 """
 
@@ -50,32 +50,40 @@ CORS(app, origins="*", supports_credentials=True)
 # --------------------------------------------------------------------------- #
 # Socket.IO – ASGI mode
 # --------------------------------------------------------------------------- #
-# The ASGI adapter lets us hand the whole thing off to Uvicorn/Gunicorn without
-# pulling in eventlet. It also means we can *mount* this app under the monorepo
-# root instead of running a second process.
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode="threading",
     logger=True,
     engineio_logger=False,
-    path="socket.io/",  # Simple path, let the mount handle the prefix
+    path="socket.io/",
 )
 logger.info("Socket.IO initialised (async_mode=threading)")
 
 # --------------------------------------------------------------------------- #
 # Blueprints & WebSocket handlers
 # --------------------------------------------------------------------------- #
-from pitext_travel.routes.travel import create_travel_blueprint  # noqa: E402
-from pitext_travel.routes.websocket import register_websocket_handlers  # noqa: E402
-
-base_dir = os.path.dirname(os.path.abspath(__file__))
-app.register_blueprint(create_travel_blueprint(base_dir))
-register_websocket_handlers(socketio)
+try:
+    from pitext_travel.routes.travel import create_travel_blueprint
+    from pitext_travel.routes.websocket import register_websocket_handlers
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    app.register_blueprint(create_travel_blueprint(base_dir))
+    register_websocket_handlers(socketio)
+    
+except ImportError as e:
+    logger.error(f"Failed to import modules: {e}")
+    logger.error("Make sure you're running from the correct directory")
 
 # --------------------------------------------------------------------------- #
 # Diagnostic routes (optional)
 # --------------------------------------------------------------------------- #
+@app.route("/")
+def index():
+    """Root route - redirect to travel interface"""
+    from flask import redirect, url_for
+    return redirect(url_for('travel.index'))
+
 @app.route("/test-socketio")
 def test_socketio():
     """Return a tiny HTML page that attempts a Socket.IO handshake."""
@@ -85,9 +93,9 @@ def test_socketio():
     <head><title>Socket.IO Test</title></head>
     <body>
       <h1>Socket.IO Connection Test</h1>
-      <div id=\"status\">Connecting...</div>
-      <div id=\"log\"></div>
-      <script src=\"https://cdn.socket.io/4.7.2/socket.io.min.js\"></script>
+      <div id="status">Connecting...</div>
+      <div id="log"></div>
+      <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
       <script>
         const log    = document.getElementById('log');
         const status = document.getElementById('status');
@@ -96,7 +104,7 @@ def test_socketio():
         add('Attempting to connect...');
 
         const socket = io('/travel/ws', {
-          path: '/travel/socket.io/',
+          path: '/socket.io/',
           transports: ['polling','websocket']
         });
 
@@ -107,7 +115,6 @@ def test_socketio():
     </body>
     </html>
     """
-
 
 @app.route("/debug")
 def debug():
@@ -128,21 +135,19 @@ def debug():
 def _connect():
     logger.info("Client connected to default namespace")
 
-
 @socketio.on("disconnect")
 def _disconnect():
     logger.info("Client disconnected from default namespace")
 
 # --------------------------------------------------------------------------- #
-# Local development runner ( `python -m pitext_travel.main` )
+# Main execution
 # --------------------------------------------------------------------------- #
-# Remove the export lines at the bottom and add:
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     logger.info("Starting travel app on http://localhost:%d", port)
     socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)
+
 # --------------------------------------------------------------------------- #
-# Export for mounting in router
+# Export for ASGI servers
 # --------------------------------------------------------------------------- #
-# Export both app and socketio so the router can properly mount them
 __all__ = ["app", "socketio"]
