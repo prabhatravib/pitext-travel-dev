@@ -62,20 +62,23 @@ class AudioCapture {
         
         const source = this.audioContext.createMediaStreamSource(this.stream);
         this.processor = this.audioContext.createScriptProcessor(2048, 1, 1);
-        
         this.processor.onaudioprocess = (e) => {
             const inputData = e.inputBuffer.getChannelData(0);
             
             // Process through VAD
             const vadResult = this.vadProcessor.processAudio(inputData);
             
+            // Debug log
+            if (vadResult.isSpeaking) {
+                console.log('[AudioCapture] Speaking detected, sending audio');
+            }
+            
             // Send audio data if speaking
             if (vadResult.isSpeaking && this.onAudioData) {
                 const pcm16 = this._float32ToPCM16(inputData);
                 this.onAudioData(pcm16);
             }
-        };
-        
+        };    
         source.connect(this.processor);
         this.processor.connect(this.audioContext.destination);
         

@@ -115,15 +115,26 @@ class RealtimeController {
 
     this.audioPlayer.onBargeIn = (ev) => this._trigger('barge_in', ev);
   }
+_setupStateMachine() {
+    this.stateMachine.onStateChange = (tr) => {
+        console.log('[RTC] State transition:', tr.from, '->', tr.to);
+        this._trigger('state_change', tr);
+    };
 
-  _setupStateMachine() {
-    this.stateMachine.onStateChange = (tr) =>
-      this._trigger('state_change', tr);
-
-    this.stateMachine.on('onEnterListening', () => this.wsClient.clearAudio());
-    this.stateMachine.on('onEnterWaiting',   () => this._trigger('ready'));
-  }
-
+    this.stateMachine.on('onEnterListening', () => {
+        console.log('[RTC] Entered LISTENING state');
+        this.wsClient.clearAudio();
+    });
+    
+    this.stateMachine.on('onEnterProcessing', () => {
+        console.log('[RTC] Entered PROCESSING state');
+    });
+    
+    this.stateMachine.on('onEnterWaiting', () => {
+        console.log('[RTC] Entered WAITING state');
+        this._trigger('ready');
+    });
+}
   _setupWebSocket() {
     this.wsClient.on('session_started', (d) => {
       this.stateMachine.forceState('WAITING');
