@@ -271,6 +271,11 @@ function renderTripOnMap(data) {
     renderDayControls(data.days);
     
     debugLog("Trip rendering complete!");
+    if (window.realtimeController) {
+    window.realtimeController.wsClient.emit('map_ready', {});
+}
+
+
 }
 
 /**

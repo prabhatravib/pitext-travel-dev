@@ -257,6 +257,22 @@ def register_websocket_handlers(socketio) -> None:
             logger.exception("Error starting session: %s", exc)
             emit("error", {"message": f"Failed to start session: {str(exc)}"})
 
+
+        # pitext_travel/routes/websocket.py
+    @socketio.on("map_ready", namespace=NAMESPACE)
+    def handle_map_ready():
+        session_id = session.get("realtime_session_id")
+        from pitext_travel.api.realtime.session_manager import get_session_manager
+        if not session_id:
+            return
+        rt_session = get_session_manager().get_session(session_id)
+        if rt_session:
+            # Ask OpenAI to deliver the pre-formatted voice_response now
+            rt_session.client.send_text(
+                "Please read the itinerary overview now."
+            )
+
+
     # ----------------------------- AUDIO DATA -------------------------------- #
     @socketio.on("audio_data", namespace=NAMESPACE)
     def handle_audio_data(data):  # noqa: ANN001

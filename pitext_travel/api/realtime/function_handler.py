@@ -133,16 +133,14 @@ class FunctionHandler:
             # For now, we'll return the data and let the WebSocket handler manage session
             
             # Format response for voice
-            stops_summary = []
-            for day_idx, day in enumerate(itinerary['days']):
-                day_stops = [stop['name'] for stop in day['stops']]
-                stops_summary.append(f"Day {day_idx + 1}: {', '.join(day_stops)}")
-            
+            bullet_lines = []
+            for i, day in enumerate(itinerary['days'], 1):
+                stops = ', '.join([s['name'] for s in day['stops']])
+                bullet_lines.append(f"Day {i}: {stops}.")
             voice_response = (
-                f"I've created a wonderful {days}-day itinerary for {city}! "
-                f"Here's a quick overview: {'. '.join(stops_summary[:2])}... "
-                f"You can see all the locations on the map. "
-                f"Would you like me to explain any specific day in detail?"
+                f"Your {days}-day adventure in {city} is ready!  "
+                + " ".join(bullet_lines)
+                + "  Say a day number if you’d like more detail."
             )
             
             return {

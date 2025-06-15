@@ -16,7 +16,7 @@ class VADProcessor {
         this.speechThreshold = options.speechThreshold || 0.025; // Increased from 0.015
         this.silenceThreshold = options.silenceThreshold || 0.01;
         this.speechPadding = options.speechPadding || 300; // ms before speech
-        this.silenceDuration = options.silenceDuration || 800; // Increased from 500ms
+        this.silenceDuration = options.silenceDuration || 400; // Increased from 500ms
         
         // State tracking
         this.isSpeaking = false;
@@ -128,7 +128,7 @@ class VADProcessor {
                 
                 // Check for speech end - require more silence frames
                 const silenceDuration = Date.now() - this.silenceStart;
-                if (silenceDuration >= this.silenceDuration && this.silenceFrames >= 15) { // Added frame count requirement
+                if (silenceDuration >= this.silenceDuration && this.silenceFrames >= 3) { // Added frame count requirement
                     this._handleSpeechEnd();
                 }
             } else {
