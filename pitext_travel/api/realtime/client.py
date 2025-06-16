@@ -91,7 +91,7 @@ class RealtimeClient:
                 kwargs={
                     "ping_interval": 20,  # send RFC‑6455 ping every 20 s
                     "ping_timeout": 5,   # drop if no pong within 5 s
-                    "sslopt": {"cert_reqs": ssl.CERT_NONE},  # Render’s CA   
+                    "sslopt": {"cert_reqs": ssl.CERT_REQUIRED},  # Render’s CA   
                 },
                 daemon=True,
             )
@@ -207,6 +207,16 @@ class RealtimeClient:
     def _on_close(self, ws, code, reason):
         logger.info("Realtime API connection closed: %s – %s", code, reason)
         self.is_connected = False
+        
+        # Add more detailed logging
+        if code:
+            logger.error("WebSocket close code: %d", code)
+            if code == 1002:
+                logger.error("Protocol error - check API key permissions")
+            elif code == 1006:
+                logger.error("Abnormal closure - possible network/SSL issue")
+            logger.info("Realtime API connection closed: %s – %s", code, reason)
+            self.is_connected = False
 
     # ------------------------------------------------------------------
     # Event‑specific handlers
@@ -326,7 +336,7 @@ class RealtimeClient:
         if extra:
             patch["session"].update(extra)
         # Handle audio format parameters
-        
+
         if "input_audio_format" in extra:
             patch["session"]["input_audio_format"] = extra["input_audio_format"]
         if "output_audio_format" in extra:
