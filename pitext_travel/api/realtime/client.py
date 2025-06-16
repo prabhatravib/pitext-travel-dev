@@ -151,12 +151,11 @@ class RealtimeClient:
         self.is_connected = True
 
         # 1 – Create session with the desired codecs
-        self._send_event(
-            {
-                "type": "session.create",
-                "input_audio_format": {"type": "pcm16", "sample_rate": 24_000},
-                "output_audio_format": {"type": "wav"},
-            }
+        self.update_session(
+            input_audio_format={"type": "pcm16", "sample_rate": 24_000},
+            output_audio_format={"type": "wav"},
+            instructions=self.config["instructions"],
+            temperature=self.config["temperature"],
         )
 
         # 2 – Immediately patch with system instructions & tools
