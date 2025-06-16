@@ -33,15 +33,9 @@ class AudioCapture {
             });
             
             // Create audio context
-            // Create audio context - let browser choose its native rate
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-            // Store actual sample rate
-            this.actualSampleRate = this.audioContext.sampleRate;
-            console.log('[AudioCapture] Browser sample rate:', this.actualSampleRate);
-
-            // We'll resample to 24kHz before sending
-            this.targetSampleRate = 24000;
+            this.audioContext = new AudioContext({
+                sampleRate: this.sampleRate
+            });
             // Log actual sample rate
             console.log('[AudioCapture] Audio context sample rate:', this.audioContext.sampleRate);
             if (this.audioContext.sampleRate !== 24000) {
@@ -79,30 +73,17 @@ class AudioCapture {
         this.processor.onaudioprocess = (e) => {
             const inputData = e.inputBuffer.getChannelData(0);
             
-            // Resample if needed
-            let processedData = inputData;
-            if (this.actualSampleRate !== this.targetSampleRate) {
-                processedData = this._resample(inputData, this.actualSampleRate, this.targetSampleRate);
-            }
-            
             // Process through VAD
-            const vadResult = this.vadProcessor.processAudio(processedData);
+            const vadResult = this.vadProcessor.processAudio(inputData);
             
-            // Log VAD state periodically
-            if (Date.now() - (this.lastLogTime || 0) > 1000) {
-                const state = this.vadProcessor.getState();
-                console.log('[AudioCapture] VAD state:', {
-                    isSpeaking: state.isSpeaking,
-                    noiseFloor: state.noiseFloor.toFixed(4),
-                    speechFrames: state.speechFrames
-                });
-                this.lastLogTime = Date.now();
+            // Debug log
+            if (vadResult.isSpeaking) {
+                console.log('[AudioCapture] Speaking detected, sending audio');
             }
             
             // Send audio data if speaking
             if (vadResult.isSpeaking && this.onAudioData) {
-                const pcm16 = this._float32ToPCM16(processedData);
-                console.log('[AudioCapture] Sending audio chunk, size:', pcm16.byteLength);
+                const pcm16 = this._float32ToPCM16(inputData);
                 this.onAudioData(pcm16);
             }
         };    
@@ -132,32 +113,9 @@ class AudioCapture {
             const s = Math.max(-1, Math.min(1, float32Array[i]));
             view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
         }
-
-        
         
         return buffer;
     }
-
-    _resample(inputData, fromRate, toRate) {
-            const ratio = toRate / fromRate;
-            const outputLength = Math.floor(inputData.length * ratio);
-            const output = new Float32Array(outputLength);
-            
-            for (let i = 0; i < outputLength; i++) {
-                const srcIndex = i / ratio;
-                const srcIndexInt = Math.floor(srcIndex);
-                const srcIndexFrac = srcIndex - srcIndexInt;
-                
-                if (srcIndexInt < inputData.length - 1) {
-                    output[i] = inputData[srcIndexInt] * (1 - srcIndexFrac) + 
-                            inputData[srcIndexInt + 1] * srcIndexFrac;
-                } else {
-                    output[i] = inputData[srcIndexInt];
-                }
-            }
-            
-            return output;
-        }
     
     isActive() {
         return this.isActive;

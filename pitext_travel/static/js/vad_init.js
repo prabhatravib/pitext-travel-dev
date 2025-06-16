@@ -67,32 +67,19 @@ class ContinuousVoiceChat {
         });
         
         // Handle voice activity for visual feedback
-// Handle voice activity for visual feedback
-        this.controller.audioCapture.vadProcessor.onVoiceActivity = (event) => {
-            // Update voice level indicator
-            this.updateVoiceLevel(event.energy);
-            
-            // Show speech detection visually
-            if (event.isSpeaking && !this.statusEl.classList.contains('speaking')) {
+        this.controller.audioCapture.onVoiceActivity = (event) => {
+            if (event.isSpeaking && this.statusEl.classList.contains('listening')) {
                 this.statusEl.classList.add('speaking');
                 this.updateStatus('Listening to you...', 'speaking');
-                
-                // Add visual pulse to voice circle
-                const circle = this.statusEl.querySelector('.voice-circle');
-                if (circle) {
-                    circle.style.transform = 'scale(1.2)';
-                }
             } else if (!event.isSpeaking && this.statusEl.classList.contains('speaking')) {
                 this.statusEl.classList.remove('speaking');
-                this.updateStatus('Processing what you said...', 'processing');
-                
-                // Reset visual
-                const circle = this.statusEl.querySelector('.voice-circle');
-                if (circle) {
-                    circle.style.transform = 'scale(1)';
-                }
+                this.updateStatus('Listening...', 'listening');
             }
-        };        
+            
+            // Update voice level indicator if you add one
+            this.updateVoiceLevel(event.energy);
+        };
+        
         // Handle transcripts
         this.controller.on('transcript', (data) => {
             if (data.role === 'user') {

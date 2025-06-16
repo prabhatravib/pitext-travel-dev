@@ -12,11 +12,12 @@ class VADProcessor {
         // Calculate samples per frame
         this.samplesPerFrame = Math.floor(this.sampleRate * this.frameSize / 1000);
         
-        // Speech detection parameters - more sensitive
-        this.speechThreshold = options.speechThreshold || 0.008; // Lower threshold
-        this.silenceThreshold = options.silenceThreshold || 0.005;
+        // Speech detection parameters - made more conservative
+        this.speechThreshold = options.speechThreshold || 0.025; // Increased from 0.015
+        this.silenceThreshold = options.silenceThreshold || 0.01;
         this.speechPadding = options.speechPadding || 300; // ms before speech
-        this.silenceDuration = options.silenceDuration || 800; // Longer silence detection        
+        this.silenceDuration = options.silenceDuration || 400; // Increased from 500ms
+        
         // State tracking
         this.isSpeaking = false;
         this.silenceStart = null;

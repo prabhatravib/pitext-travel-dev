@@ -297,17 +297,13 @@ def register_websocket_handlers(socketio):
                 if not audio_b64:
                     return
                 audio_bytes = base64.b64decode(audio_b64)
-                
-                # Log audio data size periodically
-                manager.update_session_stats(session_id, audio_sent=len(audio_bytes))
-                if realtime_session.audio_bytes_sent % 10000 < len(audio_bytes):
-                    logger.info(f"Audio sent: {realtime_session.audio_bytes_sent / 1024:.1f}KB")
-                
                 realtime_session.client.send_audio(audio_bytes)
-                    
+                manager.update_session_stats(session_id, audio_sent=len(audio_bytes))
+                
         except Exception as exc:
             logger.exception("Error handling audio data: %s", exc)
             emit("error", {"message": "Failed to process audio"})
+
     # ------------------------------ COMMIT AUDIO ----------------------------- #
     @socketio.on("commit_audio", namespace=NAMESPACE)
     def handle_commit_audio():
