@@ -151,13 +151,13 @@ class RealtimeClient:
         self.is_connected = True
 
         # 1 – Create session with the desired codecs
+# 1 – Create session with the desired codecs
         self.update_session(
-            input_audio_format={"type": "pcm16", "sample_rate": 24_000},
-            output_audio_format={"type": "wav"},
+            input_audio_format="pcm16",  # Changed from object to string
+            output_audio_format="pcm16",  # Changed from object to string
             instructions=self.config["instructions"],
             temperature=self.config["temperature"],
         )
-
         # 2 – Immediately patch with system instructions & tools
         self.update_session(
             instructions=self.config["instructions"],
@@ -301,6 +301,8 @@ class RealtimeClient:
     ) -> None:
         patch: dict[str, Any] = {"type": "session.update", "session": {}}
 
+
+
         if instructions:
             patch["session"]["instructions"] = instructions
         if functions is not None:
@@ -323,6 +325,12 @@ class RealtimeClient:
 
         if extra:
             patch["session"].update(extra)
+        # Handle audio format parameters
+        
+        if "input_audio_format" in extra:
+            patch["session"]["input_audio_format"] = extra["input_audio_format"]
+        if "output_audio_format" in extra:
+            patch["session"]["output_audio_format"] = extra["output_audio_format"]
 
         self._send_event(patch)
         logger.info(
