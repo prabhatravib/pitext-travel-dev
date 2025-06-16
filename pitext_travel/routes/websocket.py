@@ -301,8 +301,12 @@ def register_websocket_handlers(socketio):
             if realtime_session and realtime_session.client:
                 audio_b64 = data.get("audio")
                 if not audio_b64:
+                    logger.warning("No audio data in payload")  # ADD THIS
+
                     return
                 audio_bytes = base64.b64decode(audio_b64)
+                logger.info(f"Sending audio to Realtime API, size: {len(audio_b64)}")  # ADD THIS
+
                 realtime_session.client.send_audio(audio_bytes)
                 manager.update_session_stats(session_id, audio_sent=len(audio_bytes))
                 
