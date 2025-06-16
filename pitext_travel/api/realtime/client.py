@@ -184,34 +184,78 @@ class RealtimeClient:
         if self.is_model_speaking:
             event = {"type": "response.cancel"}
             self._send_event(event)
-    def update_session(self, instructions: Optional[str] = None, 
-                    functions: Optional[list] = None,
-                    temperature: Optional[float] = None):
-        """Update session configuration."""
-        session_update = {"type": "session.update", "session": {}}
-        
-        if instructions:
-            session_update["session"]["instructions"] = instructions
-            
-        if functions:
-            # Functions are already in the correct format from function_handler
-            session_update["session"]["tools"] = functions
-            
-        if temperature is not None:
-            session_update["session"]["temperature"] = temperature
-        
-    # Always include model configuration
-            session_update["session"]["voice"] = self.config["voice"]
-            session_update["session"]["turn_detection"] = {
-            "type": "server_vad",
-            "threshold": self.config["vad_threshold"],
-            "prefix_padding_ms": self.config["vad_prefix_ms"],
-            "silence_duration_ms": self.config["vad_silence_ms"]
-        }
-        
-        self._send_event(session_update)
+    def update_session(
+        self,
+        *,
+        model: str | None = None,
+        voice: str | None = None,
+        temperature: float | None = None,
+        speed: float | None = None,
+        turn_detection: dict | None = None,
+        functions: list[dict] | None = None,
+        **extra,
+        ) -> None:
+        """
+        Patch the active Realtime session with new parameters.
 
- 
+        Only the arguments that are not ``None`` are sent.
+
+        Parameters
+        ----------
+        model : str, optional
+            Model name (e.g. "gpt-4o-realtime-preview-2024-12-17").
+        voice : str, optional
+            Voice identifier (e.g. "alloy").
+        temperature : float, optional
+            Sampling temperature.
+        speed : float, optional
+            Speech speed multiplier (1.0 is normal).
+        turn_detection : dict, optional
+            Full server-VAD config block.
+        functions : list[dict], optional
+            The **flattened** list of tool objects.  Each element must have
+            ``type``, ``name``, ``description``, and ``parameters`` keys.
+        extra : dict
+            Any additional session keys to include verbatim.
+        """
+        if not self.session_id:
+            self.logger.error("Cannot update session – no active session.")
+            return
+
+        # Base payload
+        session_patch: dict[str, Any] = {"id": self.session_id}
+
+        # Standard fields
+        if model is not None:
+            session_patch["model"] = model
+        if temperature is not None:
+            session_patch["temperature"] = temperature
+        if voice is not None:
+            session_patch["voice"] = voice
+        if speed is not None:
+            session_patch["speed"] = speed
+        if turn_detection is not None:
+            session_patch["turn_detection"] = turn_detection
+
+        # Tools / function definitions
+        if functions:
+            session_patch["tools"] = functions  # <-- NO extra wrapper!
+
+        # Any caller-supplied keys
+        if extra:
+            session_patch.update(extra)
+
+        # Emit the update over the Socket.IO connection
+        try:
+            self.socket.emit("session_update", session_patch, namespace=self.namespace)
+            self.logger.info(
+                "Sent session_update for %s with keys: %s",
+                self.session_id,
+                ", ".join(session_patch.keys()),
+            )
+        except Exception as exc:
+            self.logger.exception("Failed to emit session_update: %s", exc)
+
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages."""
         try:

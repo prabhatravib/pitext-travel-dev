@@ -183,14 +183,29 @@ class FunctionHandler:
         }
     
     def get_function_definitions(self) -> list:
-        """Get function definitions for Realtime API session configuration.
-        
-        Returns:
-            List of function definitions
         """
+        Return the tool list in the exact JSON shape the Realtime API expects.
 
+        Each element must have top-level keys:
+            - type:        always "function"
+            - name:        the callable name (string)
+            - description: short human-readable summary (string)
+            - parameters:  JSON-Schema dict describing arguments (dict)
 
-        return [{"type": "function", "function": d}  for d in self.function_definitions    ]
+        Returns
+        -------
+        list
+            List of tool objects ready to drop into `session.tools`.
+        """
+        return [
+            {
+                "type": "function",
+                "name": d["name"],
+                "description": d.get("description", ""),
+                "parameters": d.get("parameters", {}),
+            }
+            for d in self.function_definitions
+        ]
     
     def format_explain_day_response(self, itinerary: Dict[str, Any], 
                                   city: str, day_number: int) -> str:
