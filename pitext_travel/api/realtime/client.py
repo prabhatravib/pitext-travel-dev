@@ -46,6 +46,17 @@ class RealtimeClient:
         self.conversation_id: Optional[str] = None
         self.current_item_id: Optional[str] = None
         self.is_model_speaking = False
+        self._ping_thread = None
+        self._stop_ping   = threading.Event()
+
+    def _start_ping(self):
+        def _loop():
+            while not self._stop_ping.is_set() and self.is_connected:
+                self._send_event({"type": "ping"})
+                self._stop_ping.wait(15)          # every 15 s
+        self._ping_thread = threading.Thread(target=_loop, daemon=True)
+        self._ping_thread.start()
+
         
     def connect(self) -> bool:
         """Establish WebSocket connection to OpenAI Realtime API."""
@@ -97,6 +108,7 @@ class RealtimeClient:
                 
             if self.ws_thread and self.ws_thread.is_alive():
                 self.ws_thread.join(timeout=2.0)
+                
     
     def _send_event(self, event: Dict[str, Any]):
         """Send event to OpenAI Realtime API."""
@@ -121,6 +133,7 @@ class RealtimeClient:
         # 2) Mark “connected” so send_audio() will work
         logger.info(f"Realtime API connection established for session {self.session_id}")
         self.is_connected = True
+        self._start_ping()
 
         # 3) Push your instructions, tool definitions, temperature, etc.
         self.update_session(
@@ -184,7 +197,7 @@ class RealtimeClient:
         if self.is_model_speaking:
             event = {"type": "response.cancel"}
             self._send_event(event)
-            
+
     def update_session(
         self,
         *,

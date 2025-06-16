@@ -182,6 +182,17 @@ class RealtimeController {
             this._trigger('error', { error });
         });
         
+        this.wsClient.on('error', (err) => {
+            console.error('Realtime WS error', err);
+            if (String(err).includes('Connection to remote host was lost')) {
+                // ask controller to reconnect transparently
+                this.stateMachine.forceState('WAITING');
+                setTimeout(() => this.wsClient.connect(), 0);
+            }
+            this._trigger('error', { error: err });
+            });
+
+        
         // Handle custom events (like render_itinerary)
         this.wsClient.on('render_itinerary', (data) => {
             this._trigger('render_itinerary', data);
