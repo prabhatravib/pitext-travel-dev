@@ -78,6 +78,12 @@ def _wire_realtime_callbacks(
                 
                 if name == "plan_trip" and result.get("success"):
                     logger.info("Emitting render_itinerary event to frontend")
+
+                    flask_session = session                     # NEW
+                    flask_session['current_itinerary'] = result['itinerary']   # NEW
+                    flask_session['current_city']      = result['city']        # NEW
+                    flask_session['current_days']      = result['days']        # NEW
+
                     socketio.emit(
                         "render_itinerary",
                         {

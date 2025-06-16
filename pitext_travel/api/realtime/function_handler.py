@@ -188,7 +188,9 @@ class FunctionHandler:
         Returns:
             List of function definitions
         """
-        return self.function_definitions
+
+
+        return [{"type": "function", "function": d}  for d in self.function_definitions    ]
     
     def format_explain_day_response(self, itinerary: Dict[str, Any], 
                                   city: str, day_number: int) -> str:
