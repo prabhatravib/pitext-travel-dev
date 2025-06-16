@@ -184,78 +184,72 @@ class RealtimeClient:
         if self.is_model_speaking:
             event = {"type": "response.cancel"}
             self._send_event(event)
+            
     def update_session(
         self,
         *,
-        model: str | None = None,
-        voice: str | None = None,
-        temperature: float | None = None,
-        speed: float | None = None,
-        turn_detection: dict | None = None,
+        instructions: str | None = None,
         functions: list[dict] | None = None,
+        temperature: float | None = None,
+        voice: str | None = None,
+        turn_detection: dict | None = None,
         **extra,
-        ) -> None:
+    ) -> None:
         """
-        Patch the active Realtime session with new parameters.
-
-        Only the arguments that are not ``None`` are sent.
+        Patch the active OpenAI Realtime session.
 
         Parameters
         ----------
-        model : str, optional
-            Model name (e.g. "gpt-4o-realtime-preview-2024-12-17").
-        voice : str, optional
-            Voice identifier (e.g. "alloy").
+        instructions : str, optional
+            New system-prompt / role instructions.
+        functions : list[dict], optional
+            FLATTENED tool list (each element has type/name/description/parameters).
         temperature : float, optional
             Sampling temperature.
-        speed : float, optional
-            Speech speed multiplier (1.0 is normal).
+        voice : str, optional
+            Voice ID (defaults to `self.config["voice"]` if not supplied).
         turn_detection : dict, optional
-            Full server-VAD config block.
-        functions : list[dict], optional
-            The **flattened** list of tool objects.  Each element must have
-            ``type``, ``name``, ``description``, and ``parameters`` keys.
+            Server-VAD block (defaults to config thresholds).
         extra : dict
-            Any additional session keys to include verbatim.
+            Any additional keys you want merged into the ``session`` object.
         """
-        if not self.session_id:
-            logger.error("Cannot update session – no active session.")
-            return
+        # -------------------- build JSON patch -------------------- #
+        patch: dict[str, Any] = {"type": "session.update", "session": {}}
 
-        # Base payload
-        session_patch: dict[str, Any] = {"id": self.session_id}
+        if instructions:
+            patch["session"]["instructions"] = instructions
 
-        # Standard fields
-        if model is not None:
-            session_patch["model"] = model
-        if temperature is not None:
-            session_patch["temperature"] = temperature
-        if voice is not None:
-            session_patch["voice"] = voice
-        if speed is not None:
-            session_patch["speed"] = speed
-        if turn_detection is not None:
-            session_patch["turn_detection"] = turn_detection
-
-        # Tools / function definitions
         if functions:
-            session_patch["tools"] = functions  # <-- NO extra wrapper!
+            patch["session"]["tools"] = functions  # already flattened!
 
-        # Any caller-supplied keys
+        if temperature is not None:
+            patch["session"]["temperature"] = temperature
+
+        # Voice & VAD
+        patch["session"]["voice"] = voice or self.config["voice"]
+        patch["session"]["turn_detection"] = (
+            turn_detection
+            or {
+                "type": "server_vad",
+                "threshold": self.config["vad_threshold"],
+                "prefix_padding_ms": self.config["vad_prefix_ms"],
+                "silence_duration_ms": self.config["vad_silence_ms"],
+                "create_response": True,
+                "interrupt_response": True,
+            }
+        )
+
+        # Any extra caller-supplied keys
         if extra:
-            session_patch.update(extra)
+            patch["session"].update(extra)
 
-        # Emit the update over the Socket.IO connection
-        try:
-            self.socket.emit("session_update", session_patch, namespace=self.namespace)
-            logger.info(
-                "Sent session_update for %s with keys: %s",
-                self.session_id,
-                ", ".join(session_patch.keys()),
-            )
-        except Exception as exc:
-            logger.exception("Failed to emit session_update: %s", exc)
-
+        # -------------------- send to OpenAI ---------------------- #
+        self._send_event(patch)            # <-- WS to OpenAI, NOT socket.io
+        logger.info(
+            "Realtime session %s updated with keys: %s",
+            self.session_id,
+            ", ".join(patch["session"].keys()),
+        )
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages."""
         try:
