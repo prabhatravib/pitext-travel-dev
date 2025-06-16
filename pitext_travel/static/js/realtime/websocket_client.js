@@ -38,7 +38,7 @@ class WebSocketClient {
                 // Connect to WebSocket namespace
                 this.socket = io(this.namespace, {
                     transports: ['websocket', 'polling'], // Allow polling as fallback
-                    path: '/travel/socket.io', 
+                    path: '/socket.io/', 
                     reconnection: true,
                     reconnectionAttempts: this.maxReconnectAttempts,
                     reconnectionDelay: 1000,
@@ -201,31 +201,22 @@ class WebSocketClient {
         console.log('Starting Realtime session...');
         return this.emit('start_session', {});
     }
-    
+
     sendAudioData(audioData) {
-        // Only send if we have valid audio data
-        if (!audioData || audioData.length === 0) {
-            return false;
-        }
-        return this.emit('audio_data', { audio: audioData });
+    if (!audioData || audioData.byteLength === 0) return false;
+    // Base64-encode the chunk
+    const b64 = btoa(
+        String.fromCharCode.apply(null, new Uint8Array(audioData))
+    );
+        return this.emit('audio_data', { audio: b64 });
     }
-commitAudio() {
-    console.log('[WebSocketClient] Committing audio buffer...');
-    
-    // Send commit event
-    const commitSuccess = this.emit('commit_audio', {});
-    
-    if (commitSuccess) {
-        console.log('[WebSocketClient] Audio committed, waiting for response...');
-        
-        // Add a small delay to ensure all audio is processed
-        setTimeout(() => {
-            console.log('[WebSocketClient] Checking for response...');
-        }, 500);
-    }
-    
-    return commitSuccess;
-}
+
+    commitAudio() {
+        console.log('[WebSocketClient] Committing audio buffer...');
+        const success = this.emit('commit_audio', {});
+        console.log('[WebSocketClient] Commit audio result:', success);
+        return success;
+    }    
     clearAudio() {
         return this.emit('clear_audio', {});
     }
