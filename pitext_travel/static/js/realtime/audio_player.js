@@ -47,36 +47,24 @@ class AudioPlayer {
             return false;
         }
     }
-async playAudioData(audioData) {
-    if (!this.audioContext) {
-        console.error('AudioContext not initialized');
-        return;
-    }
     
-    try {
-        // Convert base64 to ArrayBuffer if needed
-        let arrayBuffer;
-        if (typeof audioData === 'string') {
-            arrayBuffer = this._base64ToArrayBuffer(audioData);
-        } else {
-            arrayBuffer = audioData;
+    async playAudioData(audioData) {
+        if (!this.audioContext) {
+            console.error('AudioContext not initialized');
+            return;
         }
         
-        console.log('[AudioPlayer] Received audio data, size:', arrayBuffer.byteLength);
-        
-        // Check if it's WAV format (OpenAI sends WAV)
-        const dataView = new DataView(arrayBuffer);
-        const isWav = dataView.getUint32(0, false) === 0x52494646; // "RIFF"
-        
-        if (isWav) {
-            // Decode WAV using Web Audio API
-            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-            console.log('[AudioPlayer] Decoded WAV audio, duration:', audioBuffer.duration);
-            this._queueAudioBuffer(audioBuffer);
-        } else {
-            // Assume PCM16 format
-            const pcm16Array = new Int16Array(arrayBuffer);
-            const float32Array = this._pcm16ToFloat32(pcm16Array);
+        try {
+            // Convert base64 to ArrayBuffer if needed
+            let arrayBuffer;
+            if (typeof audioData === 'string') {
+                arrayBuffer = this._base64ToArrayBuffer(audioData);
+            } else {
+                arrayBuffer = audioData;
+            }
+            
+            // Decode PCM16 to Float32
+            const float32Array = this._pcm16ToFloat32(new Int16Array(arrayBuffer));
             
             // Create audio buffer
             const audioBuffer = this.audioContext.createBuffer(
@@ -87,19 +75,18 @@ async playAudioData(audioData) {
             
             // Copy data to buffer
             audioBuffer.copyToChannel(float32Array, 0);
-            console.log('[AudioPlayer] Created PCM audio buffer, duration:', audioBuffer.duration);
             
             // Queue for playback
             this._queueAudioBuffer(audioBuffer);
-        }
-        
-    } catch (error) {
-        console.error('Failed to play audio:', error);
-        if (this.onError) {
-            this.onError(error);
+            
+        } catch (error) {
+            console.error('Failed to play audio:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
         }
     }
-} 
+    
     _queueAudioBuffer(audioBuffer) {
         const currentTime = this.audioContext.currentTime;
         

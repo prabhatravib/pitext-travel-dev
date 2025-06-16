@@ -65,19 +65,6 @@ class ContinuousVoiceChat {
                     break;
             }
         });
-
-        // Handle assistant speaking state
-this.controller.on('assistant_speaking', (event) => {
-    if (event.speaking) {
-        this.updateStatus('Assistant is speaking...', 'assistant-speaking');
-        // Disable microphone while assistant speaks
-        this.controller.audioCapture.stop();
-    } else {
-        this.updateStatus('Listening... Just speak naturally!', 'listening');
-        // Re-enable microphone
-        this.controller.audioCapture.start();
-    }
-});
         
         // Handle voice activity for visual feedback
 // Handle voice activity for visual feedback
