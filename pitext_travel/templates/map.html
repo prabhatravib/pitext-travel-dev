@@ -119,70 +119,15 @@
     };
   </script>
 
-  <!-- 4️⃣  Voice stack – sequential loader to preserve order -->
-  <script>
-    function loadVoiceWhenIOReady () {
-      if (!window.io) return setTimeout(loadVoiceWhenIOReady, 100);
-
-      /* quick connectivity probe */
-      const probe = io('/travel/ws', {
-        transports  : ['polling', 'websocket'],
-        path        : '/socket.io/',
-        reconnection: false,
-        timeout     : 10000,
-        forceNew    : true
-      });
-
-      probe.once('connect', ()  => { probe.disconnect(); sequentialLoad(); });
-      probe.once('connect_error', err => {
-        console.error('[IO] probe failed:', err.message);
-        document.getElementById('voice-status').style.display = 'none';
-      });
-
-      function sequentialLoad () {
-        console.log('[VOICE] loading modules…');
-        const files = [
-          '/static/js/realtime/vad_processor.js',
-          '/static/js/realtime/audio_capture.js',
-          '/static/js/realtime/audio_player.js',
-          '/static/js/realtime/voice_state_machine.js',
-          '/static/js/realtime/websocket_client.js',
-          '/static/js/realtime/realtime_controller.js'
-        ];
-
-        (function next (i = 0) {
-          if (i >= files.length) return afterVoiceLoaded();
-          const s = document.createElement('script');
-          s.src = files[i];
-          s.onload  = () => next(i + 1);
-          s.onerror = () => {
-            console.error('[VOICE] failed:', files[i]);
-            document.getElementById('voice-status').style.display = 'none';
-          };
-          document.head.appendChild(s);
-        })();
-      }
-
-      function afterVoiceLoaded () {
-        console.log('[VOICE] stack ready');
-
-        /* load chat.js then vad_init.js */
-        const chat = document.createElement('script');
-        chat.src = '/static/js/chat.js';
-        chat.onload = () => {
-          const init = document.createElement('script');
-          init.src = '/static/js/vad_init.js';
-          init.onload  = () => console.log('[VOICE] init complete');
-          init.onerror = () => console.error('[VOICE] failed: vad_init.js');
-          document.head.appendChild(init);
-        };
-        chat.onerror = () => console.error('[VOICE] failed: chat.js');
-        document.head.appendChild(chat);
-      }
-    }
-    /* kick off once page parses */
-    loadVoiceWhenIOReady();
-  </script>
+  <!-- 4️⃣  Voice Components - Simple Loading -->
+  <script src="/static/js/realtime/vad_processor.js"></script>
+  <script src="/static/js/realtime/audio_capture.js"></script>
+  <script src="/static/js/realtime/audio_player.js"></script>
+  <script src="/static/js/realtime/voice_state_machine.js"></script>
+  <script src="/static/js/realtime/websocket_client.js"></script>
+  <script src="/static/js/realtime/realtime_controller.js"></script>
+  <script src="/static/js/chat.js"></script>
+  <script src="/static/js/vad_init.js"></script>
 
   <!-- 5️⃣  Main application bootstrap -->
   <script src="/static/js/app.js"></script>
@@ -193,7 +138,8 @@
       setTimeout(() => console.log('[DEBUG]', {
         socketIO          : !!window.io,
         realtimeController: !!window.RealtimeController,
-        vadProcessor      : !!window.VADProcessor
+        vadProcessor      : !!window.VADProcessor,
+        continuousVoice   : !!window.continuousVoice
       }), 2_000));
   </script>
 </body>
