@@ -107,34 +107,36 @@ class VADProcessor {
         // Update pre-buffer
         this._updatePreBuffer(frameData);
         
-        // Track speech/silence frames with improved logic
-        if (isSpeech) {
-            this.speechFrames++;
-            this.silenceFrames = 0;
-            this.silenceStart = null;
-            
-            // Require more consecutive speech frames before triggering
-            if (!this.isSpeaking && this.speechFrames >= 5) { // Changed from 3 to 5 frames
-                this._handleSpeechStart();
-            }
-        } else {
-            this.silenceFrames++;
-            
-            if (this.isSpeaking) {
-                if (!this.silenceStart) {
-                    this.silenceStart = Date.now();
-                }
-                
-                // Check for speech end - require more silence frames
-                const silenceDuration = Date.now() - this.silenceStart;
-                if (silenceDuration >= this.silenceDuration && this.silenceFrames >= 3) { // Added frame count requirement
-                    this._handleSpeechEnd();
-                }
-            } else {
-                // Gradual decay instead of immediate reset
-                this.speechFrames = Math.max(0, this.speechFrames - 1);
-            }
+// Track speech/silence frames with improved logic
+if (isSpeech) {
+    this.speechFrames++;
+    this.silenceFrames = 0;
+    this.silenceStart = null;
+    
+    // Require minimum 10 frames (200ms) of continuous speech
+    if (!this.isSpeaking && this.speechFrames >= 10) {  // Increased from 5
+        this._handleSpeechStart();
+    }
+} else {
+    this.silenceFrames++;
+    
+    if (this.isSpeaking) {
+        if (!this.silenceStart) {
+            this.silenceStart = Date.now();
         }
+        
+        // Check for speech end - require more silence
+        const silenceDuration = Date.now() - this.silenceStart;
+        if (silenceDuration >= this.silenceDuration && this.silenceFrames >= 10) {  // Increased frames
+            this._handleSpeechEnd();
+        }
+    } else {
+        // Reset speech frames if not enough continuous speech
+        if (this.speechFrames < 10) {
+            this.speechFrames = 0;
+        }
+    }
+}
         
         // Notify voice activity
         if (this.onVoiceActivity) {
@@ -170,20 +172,24 @@ class VADProcessor {
      * Detect speech based on energy and adaptive threshold
      * @private
      */
-    _detectSpeech(energy) {
-        // Use adaptive threshold based on noise floor
-        const adaptiveThreshold = Math.max(
-            this.speechThreshold,
-            this.noiseFloor * 3.5 // Increased from 2.5 to 3.5
-        );
-        
-        // Apply VAD mode (higher modes are more aggressive) - reduced sensitivity
-        const modeMultiplier = 1 + (this.vadMode * 0.15); // Reduced from 0.2 to 0.15
-        const threshold = adaptiveThreshold * modeMultiplier;
-        
-        return energy > threshold;
+_detectSpeech(energy) {
+    // Use adaptive threshold based on noise floor
+    const adaptiveThreshold = Math.max(
+        this.speechThreshold,
+        this.noiseFloor * 5.0  // Increased from 3.5 to 5.0
+    );
+    
+    // Require minimum energy level to avoid noise
+    if (energy < 0.005) {  // Absolute minimum threshold
+        return false;
     }
     
+    // Apply VAD mode (higher modes are more aggressive)
+    const modeMultiplier = 1 + (this.vadMode * 0.1);  // Reduced from 0.15
+    const threshold = adaptiveThreshold * modeMultiplier;
+    
+    return energy > threshold;
+} 
     /**
      * Update energy history for adaptive thresholding
      * @private

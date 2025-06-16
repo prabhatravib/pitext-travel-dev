@@ -160,11 +160,33 @@ class RealtimeClient:
 # pitext_travel/api/realtime/client.py
     def commit_audio(self):
         """Freeze the current input buffer and ask the model to reply."""
-        # 1) tell OpenAI we’re done collecting audio
+        # 1) tell OpenAI we're done collecting audio
         self._send_event({"type": "input_audio_buffer.commit"})
-        # 2) immediately request a response
-        self._send_event({"type": "response.create"})
-    
+        
+        # 2) Small delay to ensure buffer is processed
+        import time
+        time.sleep(0.1)
+        
+        # 3) Create a conversation item with the committed audio
+        self._send_event({
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "user",
+                "content": [{
+                    "type": "input_audio",
+                    "audio": None  # Audio is already in buffer
+                }]
+            }
+        })
+        
+        # 4) Request a response
+        self._send_event({
+            "type": "response.create",
+            "modalities": ["text", "audio"]
+        })
+        
+    logger.info("Audio committed and response requested")  
     def clear_audio_buffer(self):
         """Clear the input audio buffer."""
         event = {"type": "input_audio_buffer.clear"}
@@ -232,32 +254,29 @@ class RealtimeClient:
             event_type = event.get("type")
             
             # Enhanced logging for debugging
+# Enhanced logging for responses
             if event_type == "response.created":
-                logger.info("Response generation started")
+                logger.info("Response creation started")
+                self.is_model_speaking = True
             elif event_type == "response.done":
-                logger.info("Response generation completed")
+                logger.info("Response completed")
+                self.is_model_speaking = False
+            elif event_type == "response.failed":
+                error_info = event.get("error", {})
+                logger.error(f"Response failed: {error_info}")
             elif event_type == "response.audio.delta":
-                logger.debug(f"Audio chunk received, size: {len(event.get('delta', ''))}")
-            elif event_type == "response.text.delta":
-                logger.info(f"Text delta: {event.get('delta', '')}")
-            
-            # Log non-audio events
-            if event_type not in ["response.audio.delta", "response.audio_transcript.delta"]:
-                logger.info(f"Realtime API event: {event_type} - {event.get('item_id', 'no-id')}")
-            
-            logger.debug(f"Received event: {event_type}")
-# Debug log all events
-                        
-            # Route events to appropriate handlers
-            if event_type == "session.created":
-                self._handle_session_created(event)
-                
-            elif event_type == "session.updated":
-                self._handle_session_updated(event)
-                
+                # Log first audio chunk
+                if not hasattr(self, '_first_audio_logged'):
+                    logger.info("First audio chunk received")
+                    self._first_audio_logged = True
+            elif event_type == "response.audio_transcript.delta":
+                transcript = event.get("delta", "")
+                if transcript:
+                    logger.info(f"Assistant transcript: {transcript}")
             elif event_type == "conversation.item.created":
-                self._handle_item_created(event)
-                
+                item = event.get("item", {})
+                role = item.get("role")
+                logger.info(f"Conversation item created: role={role}")                
             elif event_type == "response.audio_transcript.delta":
                 self._handle_transcript_delta(event)
                 

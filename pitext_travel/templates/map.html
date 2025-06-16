@@ -38,6 +38,11 @@
     <span class="status-text">Initializing…</span>
   </div>
 
+  <!-- Audio test button (temporary) -->
+<button id="test-audio" style="position: fixed; top: 10px; right: 10px; z-index: 10000; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; display: none;">
+    Test Audio Level
+</button>
+
   <!---- side-chat & controls ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
 
@@ -196,5 +201,49 @@
         vadProcessor      : !!window.VADProcessor
       }), 2_000));
   </script>
+
+  // Audio level tester
+document.addEventListener('DOMContentLoaded', () => {
+    const testBtn = document.getElementById('test-audio');
+    if (testBtn) {
+        testBtn.style.display = 'block';
+        testBtn.onclick = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+                const analyser = audioContext.createAnalyser();
+                source.connect(analyser);
+                
+                const dataArray = new Float32Array(analyser.frequencyBinCount);
+                
+                const checkLevel = () => {
+                    analyser.getFloatTimeDomainData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        sum += dataArray[i] * dataArray[i];
+                    }
+                    const rms = Math.sqrt(sum / dataArray.length);
+                    
+                    console.log('Audio level (RMS):', rms.toFixed(4), 
+                               'Above threshold:', rms > 0.008);
+                    
+                    if (rms > 0.008) {
+                        testBtn.style.background = '#28a745';
+                        testBtn.textContent = 'Speaking Detected!';
+                    } else {
+                        testBtn.style.background = '#007bff';
+                        testBtn.textContent = 'Test Audio Level';
+                    }
+                };
+                
+                setInterval(checkLevel, 100);
+                
+            } catch (err) {
+                console.error('Audio test failed:', err);
+            }
+        };
+    }
+});
 </body>
 </html>
