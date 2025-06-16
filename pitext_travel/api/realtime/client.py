@@ -202,12 +202,6 @@ class RealtimeClient:
         
     # Always include model configuration
             session_update["session"]["voice"] = self.config["voice"]
-            session_update["session"]["input_audio_format"] = {
-                "type": self.config["audio_format"]["input"],          # "pcm16" by default
-                "sample_rate": self.config["audio_format"]["sample_rate"]  # 24000 by default
-            }
-            # OpenAI TTS only needs the codec for output; keep it simple
-            session_update["session"]["output_audio_format"] = {"type": "wav"}
             session_update["session"]["turn_detection"] = {
             "type": "server_vad",
             "threshold": self.config["vad_threshold"],
