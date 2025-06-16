@@ -106,26 +106,31 @@ class RealtimeController {
           this.stateMachine.onSpeechEnded();
         };
       }
-    _setupAudioPlayer() {
-        // Handle playback start
-        this.audioPlayer.onPlaybackStart = (event) => {
-            console.log('TTS playback started');
-            this.stateMachine.onResponseStarted(event);
-        };
+_setupAudioPlayer() {
+    // Handle playback start
+    this.audioPlayer.onPlaybackStart = () => {
+        console.log('[RealtimeController] TTS playback started');
+        this.stateMachine.onResponseStarted();
         
-        // Handle playback end
-        this.audioPlayer.onPlaybackEnd = (event) => {
-            console.log('TTS playback ended');
-            this.stateMachine.onSpeechCompleted(event);
-        };
-        
-        // Handle barge-in
-        this.audioPlayer.onBargeIn = (event) => {
-            console.log('Barge-in occurred');
-            this._trigger('barge_in', event);
-        };
-    }
+        // Update UI to show assistant is speaking
+        this._trigger('assistant_speaking', { speaking: true });
+    };
     
+    // Handle playback end
+    this.audioPlayer.onPlaybackEnd = () => {
+        console.log('[RealtimeController] TTS playback ended');
+        this.stateMachine.onSpeechCompleted();
+        
+        // Update UI to show assistant stopped speaking
+        this._trigger('assistant_speaking', { speaking: false });
+    };
+    
+    // Handle errors
+    this.audioPlayer.onError = (error) => {
+        console.error('[RealtimeController] Audio playback error:', error);
+        this._trigger('audio_error', { error });
+    };
+}  
     _setupStateMachine() {
         // State change notifications
         this.stateMachine.onStateChange = (transition) => {
@@ -168,13 +173,21 @@ class RealtimeController {
             this._trigger('transcript', data);
         });
         
-        // Handle audio chunks from TTS
-        this.wsClient.on('audio_chunk', (data) => {
-            if (data.audio) {
-                this.audioPlayer.playAudioData(data.audio);
-            }
-        });
+// Handle audio chunks from TTS
+this.wsClient.on('audio_chunk', (data) => {
+    if (data.audio) {
+        console.log('[RealtimeController] Received audio chunk');
         
+        // Play audio immediately
+        this.audioPlayer.playAudioData(data.audio);
+        
+        // Update stats
+        const audioSize = typeof data.audio === 'string' 
+            ? Math.floor(data.audio.length * 0.75) // Base64 to bytes estimate
+            : data.audio.byteLength;
+        console.log('[RealtimeController] Audio chunk size:', audioSize);
+    }
+});        
         // Handle errors
         this.wsClient.on('error', (error) => {
             console.error('WebSocket error:', error);

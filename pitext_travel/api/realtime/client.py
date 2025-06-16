@@ -111,23 +111,34 @@ class RealtimeClient:
 # new signature — self + ws argument
     def _on_open(self, ws):
         """Handle WebSocket connection opened."""
-        # 1) Tell OpenAI we’re starting a session
-        self._send_event({
-            "type": "session.create",
-            "input_audio_format": {"type": "pcm16", "sample_rate": 24000},
-            "output_audio_format": {"type": "wav"}
-        })
-
-        # 2) Mark “connected” so send_audio() will work
+        # Configure session with correct audio formats
+        session_config = {
+            "type": "session.update",
+            "session": {
+                "modalities": ["text", "audio"],
+                "voice": self.config["voice"],
+                "instructions": self.config["instructions"],
+                "input_audio_format": "pcm16",
+                "output_audio_format": "pcm16",  # Change from "wav" to "pcm16"
+                "input_audio_transcription": {
+                    "model": "whisper-1"
+                },
+                "turn_detection": {
+                    "type": "server_vad",
+                    "threshold": self.config["vad_threshold"],
+                    "prefix_padding_ms": self.config["vad_prefix_ms"],
+                    "silence_duration_ms": self.config["vad_silence_ms"],
+                    "create_response": True
+                },
+                "temperature": self.config["temperature"],
+                "max_response_output_tokens": "inf"
+            }
+        }
+        
+        self._send_event(session_config)
+        
         logger.info(f"Realtime API connection established for session {self.session_id}")
-        self.is_connected = True
-
-        # 3) Push your instructions, tool definitions, temperature, etc.
-        self.update_session(
-            instructions=self.config["instructions"],
-            temperature=self.config["temperature"]
-        )
-    
+        self.is_connected = True    
     def send_audio(self, audio_data: bytes):
         """Send audio data to OpenAI."""
         if not self.is_connected:
@@ -220,10 +231,22 @@ class RealtimeClient:
             event = json.loads(message)
             event_type = event.get("type")
             
-            logger.debug(f"Received event: {event_type}")
-# Debug log all events
+            # Enhanced logging for debugging
+            if event_type == "response.created":
+                logger.info("Response generation started")
+            elif event_type == "response.done":
+                logger.info("Response generation completed")
+            elif event_type == "response.audio.delta":
+                logger.debug(f"Audio chunk received, size: {len(event.get('delta', ''))}")
+            elif event_type == "response.text.delta":
+                logger.info(f"Text delta: {event.get('delta', '')}")
+            
+            # Log non-audio events
             if event_type not in ["response.audio.delta", "response.audio_transcript.delta"]:
                 logger.info(f"Realtime API event: {event_type} - {event.get('item_id', 'no-id')}")
+            
+            logger.debug(f"Received event: {event_type}")
+# Debug log all events
                         
             # Route events to appropriate handlers
             if event_type == "session.created":
