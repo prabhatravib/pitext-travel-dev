@@ -219,7 +219,7 @@ class RealtimeClient:
             Any additional session keys to include verbatim.
         """
         if not self.session_id:
-            self.logger.error("Cannot update session – no active session.")
+            logger.error("Cannot update session – no active session.")
             return
 
         # Base payload
@@ -248,13 +248,13 @@ class RealtimeClient:
         # Emit the update over the Socket.IO connection
         try:
             self.socket.emit("session_update", session_patch, namespace=self.namespace)
-            self.logger.info(
+            logger.info(
                 "Sent session_update for %s with keys: %s",
                 self.session_id,
                 ", ".join(session_patch.keys()),
             )
         except Exception as exc:
-            self.logger.exception("Failed to emit session_update: %s", exc)
+            logger.exception("Failed to emit session_update: %s", exc)
 
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages."""
