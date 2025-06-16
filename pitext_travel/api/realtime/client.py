@@ -52,8 +52,13 @@ class RealtimeClient:
     def _start_ping(self):
         def _loop():
             while not self._stop_ping.is_set() and self.is_connected:
-                self._send_event({"type": "ping"})
-                self._stop_ping.wait(15)          # every 15 s
+                try:
+                    # *** web-socket frame, *not* JSON  ***
+                    self._ws.sock.ping()
+                except Exception as exc:
+                    logger.warning("heartbeat ping failed: %s", exc)
+                # OpenAI drops after 60 s idle → ping every 20 s is safe
+                self._stop_ping.wait(20)
         self._ping_thread = threading.Thread(target=_loop, daemon=True)
         self._ping_thread.start()
 
@@ -101,6 +106,7 @@ class RealtimeClient:
     
     def disconnect(self):
         """Close WebSocket connection."""
+        self._stop_ping.set()
         with self.connection_lock:
             if self.ws:
                 self.ws.close()
