@@ -1,5 +1,5 @@
 // static/js/ui/voice_ui.js
-// Unified Voice UI controller combining button and status functionality
+// Enhanced Voice UI controller with improved map integration
 
 class VoiceUI {
     constructor() {
@@ -11,6 +11,8 @@ class VoiceUI {
         this.isReady = false;
         this.isListening = false;
         this.isAssistantSpeaking = false;
+        this.initializationAttempts = 0;
+        this.maxInitAttempts = 3;
         
         console.log('VoiceUI initialized');
     }
@@ -22,10 +24,17 @@ class VoiceUI {
         }
         
         try {
-            this.updateStatus('Requesting microphone...', 'initializing');
+            this.updateStatus('Checking microphone access...', 'initializing');
+            
+            // Check for required dependencies
+            if (!this._checkDependencies()) {
+                throw new Error('Required voice components not available');
+            }
             
             // Initialize the realtime controller
             this.controller = new window.RealtimeController();
+            
+            // Set up event handlers before initialization
             this.setupEventHandlers();
             
             const initialized = await this.controller.initialize();
@@ -37,14 +46,60 @@ class VoiceUI {
             this.isReady = true;
             this.updateStatus('Ready - Click to start voice chat', 'ready');
             
-            console.log('VoiceUI initialized successfully');
+            // Integrate with main app if available
+            if (window.TravelApp && window.TravelApp.setupVoiceIntegration) {
+                window.TravelApp.setupVoiceIntegration(this.controller);
+                console.log('✅ Voice integrated with main app');
+            }
+            
+            console.log('✅ VoiceUI initialized successfully');
             return true;
             
         } catch (error) {
-            console.error('Voice UI initialization failed:', error);
-            this.updateStatus('Voice unavailable - Check microphone', 'error');
+            this.initializationAttempts++;
+            console.error(`Voice UI initialization failed (attempt ${this.initializationAttempts}):`, error);
+            
+            if (this.initializationAttempts < this.maxInitAttempts) {
+                console.log(`Retrying voice initialization in 2 seconds...`);
+                setTimeout(() => this.initialize(), 2000);
+                this.updateStatus('Retrying initialization...', 'initializing');
+                return false;
+            } else {
+                this.updateStatus('Voice unavailable - Check microphone', 'error');
+                return false;
+            }
+        }
+    }
+    
+    _checkDependencies() {
+        const required = [
+            'RealtimeController',
+            'AudioCapture', 
+            'AudioPlayer',
+            'WebSocketClient',
+            'VoiceStateMachine'
+        ];
+        
+        for (const dep of required) {
+            if (!window[dep]) {
+                console.error(`Missing required dependency: ${dep}`);
+                return false;
+            }
+        }
+        
+        // Check for WebSocket support
+        if (!window.io) {
+            console.error('Socket.IO not available');
             return false;
         }
+        
+        // Check for audio support
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error('Microphone access not supported');
+            return false;
+        }
+        
+        return true;
     }
     
     setupClickHandler() {
@@ -54,8 +109,13 @@ class VoiceUI {
             e.preventDefault();
             e.stopPropagation();
             
-            if (!this.isReady || this.isAssistantSpeaking) {
-                console.log('Click ignored - not ready or assistant speaking');
+            if (!this.isReady) {
+                console.log('Click ignored - not ready');
+                return;
+            }
+            
+            if (this.isAssistantSpeaking) {
+                console.log('Click ignored - assistant is speaking');
                 return;
             }
             
@@ -68,18 +128,19 @@ class VoiceUI {
     async toggleListening() {
         if (this.isListening) {
             // Stop listening
-            console.log('Stopping voice chat...');
+            console.log('🛑 Stopping voice chat...');
             this.controller.disconnect();
             this.isListening = false;
             this.updateStatus('Ready - Click to start voice chat', 'ready');
             
+            // Disable audio capture
             if (this.controller.audioCapture) {
                 this.controller.audioCapture.setEnabled(false);
             }
         } else {
             // Start listening
-            console.log('Starting voice chat...');
-            this.updateStatus('Connecting...', 'connecting');
+            console.log('🎤 Starting voice chat...');
+            this.updateStatus('Connecting to voice service...', 'connecting');
             
             const connected = await this.controller.connect();
             
@@ -87,11 +148,15 @@ class VoiceUI {
                 this.isListening = true;
                 this.updateStatus('Listening... Speak naturally!', 'listening');
                 
+                // Enable audio capture
                 if (this.controller.audioCapture) {
                     this.controller.audioCapture.setEnabled(true);
                 }
+                
+                console.log('✅ Voice chat started successfully');
             } else {
                 this.updateStatus('Connection failed - Click to retry', 'error');
+                console.error('❌ Failed to start voice chat');
             }
         }
         
@@ -101,28 +166,50 @@ class VoiceUI {
     setupEventHandlers() {
         // Handle state changes from RealtimeController
         this.controller.on('state_change', (event) => {
-            console.log('Voice state change:', event.to);
+            console.log(`🔄 Voice state: ${event.from} → ${event.to}`);
             
             switch (event.to) {
                 case 'LISTENING':
-                    this.updateStatus('Listening to you...', 'speaking');
+                    this.updateStatus('👂 Listening to you...', 'speaking');
                     this.isAssistantSpeaking = false;
+                    
+                    // Notify chat system
+                    if (window.chatInstance) {
+                        window.chatInstance.handleVoiceStatus('listening');
+                    }
                     break;
+                    
                 case 'PROCESSING':
-                    this.updateStatus('Processing your request...', 'processing');
+                    this.updateStatus('🧠 Processing your request...', 'processing');
                     if (this.controller.audioCapture) {
                         this.controller.audioCapture.setEnabled(false);
                     }
+                    
+                    if (window.chatInstance) {
+                        window.chatInstance.handleVoiceStatus('processing');
+                    }
                     break;
+                    
                 case 'SPEAKING':
-                    this.updateStatus('Assistant speaking...', 'assistant-speaking');
+                    this.updateStatus('🗣️ Assistant speaking...', 'assistant-speaking');
                     this.isAssistantSpeaking = true;
+                    
+                    if (window.chatInstance) {
+                        window.chatInstance.handleVoiceStatus('speaking');
+                    }
                     break;
+                    
                 case 'WAITING':
-                    this.updateStatus('Listening... Speak naturally!', 'listening');
+                    this.updateStatus('✅ Ready - Speak when ready!', 'listening');
                     this.isAssistantSpeaking = false;
+                    
+                    // Re-enable audio capture if still listening
                     if (this.controller.audioCapture && this.isListening) {
                         this.controller.audioCapture.setEnabled(true);
+                    }
+                    
+                    if (window.chatInstance) {
+                        window.chatInstance.handleVoiceStatus('ready');
                     }
                     break;
             }
@@ -132,45 +219,78 @@ class VoiceUI {
         
         // Handle connection events
         this.controller.on('connected', () => {
-            console.log('Voice connected successfully');
+            console.log('🔗 Voice service connected');
         });
         
         this.controller.on('ready', () => {
-            console.log('Voice session ready');
+            console.log('✅ Voice session ready');
             this.updateStatus('Listening... Speak naturally!', 'listening');
         });
         
         // Handle transcripts for chat display
-// Handle transcripts for chat display
-// Handle transcripts for chat display
         this.controller.on('transcript', (data) => {
             if (window.chatInstance) {
                 window.chatInstance.updateTranscript(data);
             }
-        });        // Handle itinerary rendering
+        });
+        
+        // Handle itinerary rendering - ENHANCED INTEGRATION
         this.controller.on('render_itinerary', (data) => {
-            console.log('Rendering itinerary from voice:', data);
+            console.log('🎤 Voice triggered itinerary render:', data);
+            
             if (window.TravelApp && data.itinerary) {
-                window.TravelApp.renderTripOnMap(data.itinerary);
+                // Ensure map is ready
+                if (window.mapModulesReady) {
+                    console.log('🗺️ Map ready, rendering itinerary immediately');
+                    window.TravelApp.renderTripOnMap(data.itinerary);
+                } else {
+                    console.log('🗺️ Map not ready, queuing for later');
+                    window.pendingRender = data.itinerary;
+                }
+                
+                // Add success message to chat
+                if (window.chatInstance) {
+                    const city = data.city || 'your destination';
+                    const days = data.days || 'several';
+                    window.chatInstance.addBubble('assistant', 
+                        `🗺️ I've created your ${days}-day itinerary for ${city}! You can see it on the map.`
+                    );
+                }
             }
         });
         
         // Handle errors
         this.controller.on('error', (error) => {
-            console.error('Voice error:', error);
+            console.error('🚫 Voice error:', error);
             this.updateStatus('Voice error - Click to retry', 'error');
+            this.isListening = false;
+            this.isAssistantSpeaking = false;
+            this.updateButtonState();
+            
+            // Show error in chat
+            if (window.chatInstance) {
+                window.chatInstance.handleError(error);
+            }
+        });
+        
+        // Handle disconnection
+        this.controller.on('disconnected', () => {
+            console.log('🔌 Voice service disconnected');
             this.isListening = false;
             this.isAssistantSpeaking = false;
             this.updateButtonState();
         });
         
-        // Handle disconnection
-        this.controller.on('disconnected', () => {
-            console.log('Voice disconnected');
-            this.isListening = false;
-            this.isAssistantSpeaking = false;
-            this.updateButtonState();
+        // Handle OpenAI VAD events
+        this.controller.on('speech_started', () => {
+            console.log('🎤 OpenAI detected speech start');
         });
+        
+        this.controller.on('speech_stopped', () => {
+            console.log('🔇 OpenAI detected speech end');
+        });
+        
+        console.log('Event handlers configured');
     }
     
     updateStatus(text, className) {
@@ -196,6 +316,8 @@ class VoiceUI {
         if (this.buttonEl) {
             this.buttonEl.title = text;
         }
+        
+        console.log(`🎭 Status: ${text}`);
     }
     
     updateButtonState() {
@@ -211,7 +333,7 @@ class VoiceUI {
     
     // Public API methods
     startListening() {
-        if (!this.isListening) {
+        if (!this.isListening && this.isReady) {
             this.toggleListening();
         }
     }
@@ -227,8 +349,25 @@ class VoiceUI {
             isReady: this.isReady,
             isListening: this.isListening,
             isAssistantSpeaking: this.isAssistantSpeaking,
+            initializationAttempts: this.initializationAttempts,
             controller: this.controller ? this.controller.getState() : null
         };
+    }
+    
+    // Force restart if needed
+    async restart() {
+        console.log('🔄 Restarting voice UI...');
+        
+        if (this.controller) {
+            this.controller.disconnect();
+        }
+        
+        this.isReady = false;
+        this.isListening = false;
+        this.isAssistantSpeaking = false;
+        this.initializationAttempts = 0;
+        
+        return await this.initialize();
     }
 }
 

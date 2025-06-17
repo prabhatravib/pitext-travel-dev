@@ -28,13 +28,15 @@
 <div id="voice-button" class="voice-button" title="Click to start voice chat">
   <div class="voice-circle">
     <svg viewBox="0 0 24 24" width="24" height="24">
-      <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 0 0 1 4-4z"/>
+      <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
       <path d="M19 10a7 7 0 0 1-14 0"/>
       <path d="M12 19v4M8 23h8"/>
     </svg>
   </div>
   <span class="status-text">Initializing…</span>
-</div>  <!---- side-chat & controls ---->
+</div>  
+
+  <!---- side-chat & controls ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
 
   <div id="panel">
@@ -53,28 +55,8 @@
 
   <!--────────────────────────  JS SECTION  ────────────────────────-->
 
-  <!-- 0️⃣  Socket.IO (local → CDN fallback) -->
-  <script>
-    (function loadSocketIO () {
-      function trySrc (src, done) {
-        const s = document.createElement('script');
-        s.src = src; s.async = true;
-        s.onload  = () => done(typeof io !== 'undefined');
-        s.onerror = () => done(false);
-        document.head.appendChild(s);
-      }
-      trySrc('/socket.io/socket.io.js', ok => {
-        if (ok) return console.log('[IO] loaded locally');
-        console.warn('[IO] local failed – trying CDN');
-        trySrc('https://cdn.socket.io/4.7.4/socket.io.min.js', ok2 => {
-          if (!ok2) {
-            console.error('[IO] failed everywhere – voice disabled');
-            document.getElementById('voice-status').style.display = 'none';
-          } else console.log('[IO] loaded from CDN');
-        });
-      });
-    })();
-  </script>
+  <!-- 0️⃣  Socket.IO loader -->
+  <script src="/static/js/utils/socketio-loader.js"></script>
 
   <!-- 1️⃣  Core utilities -->
   <script src="/static/js/utils/constants.js"></script>
@@ -90,31 +72,8 @@
 
   <!-- 3️⃣  Google Maps + map helpers -->
   <script src="/static/js/map/google-maps.js"></script>
+  <script src="/static/js/map/module-loader.js"></script>
   <script async src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
-
-  <script>
-    /* map helper loader (parallel is okay here) */
-    window.loadMapModules = () => {
-      const list = [
-        '/static/js/map/markers.js',
-        '/static/js/map/routes.js',
-        '/static/js/map/controls.js'
-      ];
-      let done = 0;
-      list.forEach(src => {
-        const s = document.createElement('script');
-        s.src = src;
-        s.onload  = () => (++done === list.length) && (
-          window.mapModulesReady = true,
-          console.log('[MAP] all modules loaded'),
-          window.pendingRender && (window.TravelApp.renderTripOnMap(window.pendingRender),
-                                   window.pendingRender = null)
-        );
-        s.onerror = () => console.error('[MAP] failed:', src);
-        document.head.appendChild(s);
-      });
-    };
-  </script>
 
   <!-- 4️⃣  Voice Components -->
   <script src="/static/js/realtime/audio_capture.js"></script>
@@ -128,119 +87,7 @@
   <script src="/static/js/app.js"></script>
 
   <!-- 6️⃣  Voice initialization -->
-<!-- 6️⃣  Voice initialization -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    console.log('Initializing unified voice UI...');
-    
-    if (window.VoiceUI && window.RealtimeController) {
-      window.voiceUI = new VoiceUI();
-      window.voiceUI.initialize().then(success => {
-        if (success) {
-          console.log('Unified voice UI ready');
-        } else {
-          console.error('Voice UI failed to initialize');
-          // Hide the button if initialization failed
-          const btn = document.getElementById('voice-button');
-          if (btn) btn.style.display = 'none';
-        }
-      });
-    } else {
-      console.error('Required voice components not loaded');
-      // Hide the button if components missing
-      const btn = document.getElementById('voice-button');
-      if (btn) btn.style.display = 'none';
-    }
-  }, 1000);
-});
-</script>
-  <!-- CSS fixes for mic button -->
-  <style>
-    .mic-btn {
-      position: fixed !important;
-      right: 1rem !important;
-      bottom: 1rem !important;
-      width: 56px !important;
-      height: 56px !important;
-      border-radius: 50% !important;
-      background: #4CAF50 !important;
-      color: white !important;
-      border: none !important;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-      cursor: pointer !important;
-      z-index: 10025 !important;
-      display: none; /* Remove !important so JS can override */
-      align-items: center !important;
-      justify-content: center !important;
-      transition: all 0.3s ease !important;
-    }
+  <script src="/static/js/ui/voice-initializer.js"></script>
 
-    .mic-btn:hover:not(.disabled) {
-      background: #45a049 !important;
-      transform: scale(1.1) !important;
-    }
-
-    .mic-btn.active {
-      background: #f44336 !important;
-      animation: pulse-recording 1.5s infinite !important;
-    }
-
-    .mic-btn.disabled {
-      background: #9e9e9e !important;
-      cursor: not-allowed !important;
-      opacity: 0.6 !important;
-    }
-
-    .mic-btn.ready {
-      background: #4CAF50 !important;
-      animation: pulse-ready 2s infinite !important;
-    }
-
-    @keyframes pulse-recording {
-      0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
-      70% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-    }
-
-    @keyframes pulse-ready {
-      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
-      70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-    }
-</style>
-    .mic-btn:hover {
-      background: #45a049 !important;
-      transform: scale(1.1) !important;
-    }
-
-    .mic-btn.active {
-      background: #f44336 !important;
-      animation: pulse-recording 1.5s infinite !important;
-    }
-
-    .mic-btn.disabled {
-      background: #9e9e9e !important;
-      cursor: not-allowed !important;
-      opacity: 0.6 !important;
-    }
-
-    .mic-btn.ready {
-      background: #4CAF50 !important;
-      animation: pulse-ready 2s infinite !important;
-    }
-
-    @keyframes pulse-recording {
-      0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
-      70% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-    }
-
-    @keyframes pulse-ready {
-      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
-      70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-    }
-  </style>
 </body>
 </html>
