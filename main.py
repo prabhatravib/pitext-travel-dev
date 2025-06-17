@@ -28,6 +28,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
+# Suppress verbose socketio/engineio logs
+logging.getLogger('socketio').setLevel(logging.WARNING)
+logging.getLogger('engineio').setLevel(logging.WARNING)
+logging.getLogger('socketio.server').setLevel(logging.WARNING) 
+logging.getLogger('engineio.server').setLevel(logging.WARNING)
 # ------------------------------------------------------------------------------
 # Flask -- templates & static live under pitext_travel/
 # ------------------------------------------------------------------------------
@@ -59,7 +69,7 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="eventlet",
     logger=True,
-    engineio_logger=True  
+    engineio_logger=False  
     #path="travel/socket.io",
 )
 logger.info("Socket.IO initialised (async_mode=eventlet)")
