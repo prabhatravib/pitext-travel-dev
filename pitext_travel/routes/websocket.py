@@ -62,7 +62,6 @@ def _wire_realtime_callbacks(
             )
         except Exception as exc:
             logger.exception("Failed emitting transcript: %s", exc)
-
     # -- function calls -------------------------------------------------------
     def _on_function_call(call_id: str, name: str, args: dict) -> None:
         try:

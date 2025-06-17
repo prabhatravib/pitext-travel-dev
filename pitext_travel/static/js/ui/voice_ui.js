@@ -141,13 +141,13 @@ class VoiceUI {
         });
         
         // Handle transcripts for chat display
+// Handle transcripts for chat display
+// Handle transcripts for chat display
         this.controller.on('transcript', (data) => {
             if (window.chatInstance) {
-                window.chatInstance.addBubble(data.role || 'assistant', data.text);
+                window.chatInstance.updateTranscript(data);
             }
-        });
-        
-        // Handle itinerary rendering
+        });        // Handle itinerary rendering
         this.controller.on('render_itinerary', (data) => {
             console.log('Rendering itinerary from voice:', data);
             if (window.TravelApp && data.itinerary) {
