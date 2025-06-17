@@ -1,9 +1,9 @@
-// static/js/app.js – Main Application Entry Point with WebSocket support
+// static/js/app.js – Main Application Entry Point with WebSocket & Voice Support
 
 // Store trip data globally
 let tripData = null;
 
-// WebSocket connection state
+// Connection state flags
 let wsConnected = false;
 let realtimeReady = false;
 let mapReadySent = false; // ensure we only emit once per itinerary render
@@ -15,11 +15,39 @@ document.addEventListener("DOMContentLoaded", () => {
     const { debugLog } = window.TravelHelpers;
     debugLog("DOM loaded, setting up travel planner...");
 
-    // Initialize UI components
+    // Initialize core UI components
     window.TravelPanel.initializePanel();
     window.TravelForm.initializeForm();
 
-    // Initialize voice/chat system based on browser support
+    // Bootstrap Voice UI & Realtime Controller if available
+    if (window.VoiceUI && window.RealtimeController) {
+        try {
+            window.VoiceUI.initialize();
+            window.RealtimeController.initialize();
+            debugLog('VoiceUI & RealtimeController initialized');
+        } catch (err) {
+            console.error('Voice initialization error:', err);
+        }
+    }
+
+    // Fallback click binder for mic button
+    const micBtn = document.querySelector('.voice-ui .voice-ui__button');
+    if (micBtn) {
+        const listeners = getEventListeners(micBtn).click || [];
+        if (listeners.length === 0) {
+            micBtn.addEventListener('click', async () => {
+                try {
+                    await window.RealtimeController.startAudioSession();
+                    const bubble = document.querySelector('.voice-ui__bubble');
+                    if (bubble) bubble.textContent = 'Listening…';
+                } catch (e) {
+                    console.error('Failed to start audio session:', e);
+                }
+            });
+        }
+    }
+
+    // Initialize communication (WebSocket for voice or HTTP for text)
     initializeCommunication();
 
     // Start loading Google Maps API
@@ -32,7 +60,6 @@ document.addEventListener("DOMContentLoaded", () => {
 function initializeCommunication() {
     const { debugLog } = window.TravelHelpers;
 
-    // Check for WebSocket and audio support
     const hasWebSocketSupport = 'WebSocket' in window;
     const hasAudioSupport = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
 
@@ -51,72 +78,53 @@ function initializeCommunication() {
 function initializeWebSocket() {
     const { debugLog, errorLog } = window.TravelHelpers;
 
-    // Wait for Socket.IO to be present in the page
     if (!window.io) {
         debugLog("Socket.IO not loaded yet, retrying...");
-        setTimeout(initializeWebSocket, 500);
-        return;
+        return setTimeout(initializeWebSocket, 500);
     }
-
-    // Wait for the dynamically imported Realtime module
     if (!window.RealtimeController) {
-        debugLog("Realtime module not loaded yet, deferring WebSocket init");
-        setTimeout(initializeWebSocket, 100);
-        return;
+        debugLog("RealtimeController not loaded yet, deferring WebSocket init");
+        return setTimeout(initializeWebSocket, 100);
     }
 
     try {
-        // Create controller instance
         const realtime = new window.RealtimeController();
-
-        // ✅ Store globally for other modules *before* wiring listeners that may reference it
         window.realtimeController = realtime;
 
-        /* ------------------------------------------------------------------ */
-        /*                               Events                               */
-        /* ------------------------------------------------------------------ */
-
+        // Event: connected
         realtime.on('connected', () => {
             wsConnected = true;
             debugLog("WebSocket connected successfully");
         });
 
+        // Event: ready for voice
         realtime.on('ready', () => {
             realtimeReady = true;
             debugLog("Realtime API ready for voice interaction");
-
-            // UI feedback – pulsing mic icon
             const micBtn = document.getElementById('mic-btn');
             if (micBtn) {
                 micBtn.classList.add('ready');
-                micBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="24" height="24">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2">
-                            <animate attributeName="r" from="8" to="12" dur="1.5s" repeatCount="indefinite" />
-                            <animate attributeName="opacity" from="1" to="0.3" dur="1.5s" repeatCount="indefinite" />
-                        </circle>
-                        <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z" />
-                    </svg>`;
                 micBtn.title = "Voice assistant is listening...";
             }
         });
 
-        realtime.on('error', (error) => {
-            errorLog("Realtime error:", error);
-            if (error.critical) {
+        // Event: error
+        realtime.on('error', (err) => {
+            errorLog("Realtime error:", err);
+            if (err.critical) {
                 wsConnected = false;
                 realtimeReady = false;
             }
         });
 
-        // 🔑 MAIN callback – itinerary delivered from backend
+        // Event: itinerary data
         realtime.on('render_itinerary', (data) => {
             debugLog("Received itinerary from voice command:", data);
             if (data.itinerary) {
                 tripData = data.itinerary;
                 renderTripOnMap(data.itinerary);
 
-                // Once the map is drawn, notify the backend exactly once
+                // Notify backend once map is ready
                 if (!mapReadySent && realtime.wsClient) {
                     realtime.wsClient.emit('map_ready', {});
                     mapReadySent = true;
@@ -124,9 +132,8 @@ function initializeWebSocket() {
             }
         });
 
-        // Finally, open the socket connection
+        // Open the connection
         realtime.connect();
-
     } catch (error) {
         errorLog("Failed to initialize WebSocket:", error);
     }
@@ -150,7 +157,7 @@ async function loadGoogleMapsAPI() {
 }
 
 /**
- * Initialize when Google Maps API is loaded (callback function)
+ * Callback once Google Maps script has loaded
  */
 window.initializeApp = function () {
     const { debugLog } = window.TravelHelpers;
@@ -160,28 +167,18 @@ window.initializeApp = function () {
 
     try {
         initializeGoogleMap();
-
-        // Auto‑load map helper modules (markers, routes, controls)
-        if (window.loadMapModules) {
-            debugLog('Loading map modules...');
-            window.loadMapModules();
-        } else {
-            debugLog('loadMapModules function not found!');
-        }
-
-        // If an itinerary arrived during map‑loading, render it now
+        if (window.loadMapModules) window.loadMapModules();
         if (window.pendingRender) {
             renderTripOnMap(window.pendingRender);
             window.pendingRender = null;
         }
     } catch (error) {
-        const { showError } = window.TravelOverlays;
-        showError(`Map initialization failed: ${error.message}`);
+        window.TravelOverlays.showError(`Map initialization failed: ${error.message}`);
     }
 };
 
 /**
- * Fallback HTTP itinerary fetch (used when voice isn’t available)
+ * Fallback HTTP itinerary fetch
  */
 async function processItinerary(city, days) {
     const { debugLog } = window.TravelHelpers;
@@ -190,19 +187,15 @@ async function processItinerary(city, days) {
     const { fetchItinerary } = window.TravelAPI;
 
     if (!isMapLoaded()) {
-        showError("Google Maps is still loading. Please wait a moment and try again.");
-        return;
+        return showError("Google Maps is still loading. Please wait a moment and try again.");
     }
 
-    // If voice is active, let the server handle it via WebSocket
     if (isVoiceAvailable()) {
         debugLog("Processing itinerary through voice interface");
         return;
     }
 
-    // Otherwise, call REST endpoint
     showLoading("Generating your trip itinerary!");
-
     try {
         const data = await fetchItinerary(city, days);
         tripData = data;
@@ -214,7 +207,7 @@ async function processItinerary(city, days) {
 }
 
 /**
- * Render the complete trip on Google Maps
+ * Render the trip on Google Maps
  */
 function renderTripOnMap(data) {
     const { debugLog } = window.TravelHelpers;
@@ -222,96 +215,57 @@ function renderTripOnMap(data) {
     const { fitMapToBounds } = window.TravelGoogleMaps;
 
     if (!window.mapModulesReady) {
-        debugLog("Map modules not ready yet, storing pending render...");
+        debugLog("Map modules not ready, queuing render...");
         window.pendingRender = data;
         return;
     }
 
-    debugLog("Map modules ready, rendering trip...");
+    debugLog("Rendering trip on map...");
+    window.TravelMarkers.clearAllMarkers();
+    window.TravelRoutes.clearAllRoutes();
+    window.TravelControls.clearDayControls();
 
-    const { createAllMarkers, clearAllMarkers } = window.TravelMarkers;
-    const { createAllRoutes, clearAllRoutes } = window.TravelRoutes;
-    const { renderDayControls, clearDayControls } = window.TravelControls;
-
-    if (!data.days || data.days.length === 0) {
-        showError("No itinerary data to display");
-        return;
-    }
-
-    clearMapElements();
-
-    // Create markers
-    const { bounds, totalStops } = createAllMarkers(data);
-
-    // Create routes
-    createAllRoutes(data);
-
-    // Hide all days except the first one
-    data.days.forEach((_, index) => {
-        if (index > 0) {
-            window.TravelMarkers.toggleMarkersForDay(index, false);
-            window.TravelRoutes.toggleRoutesForDay(index, false);
+    const { bounds, totalStops } = window.TravelMarkers.createAllMarkers(data);
+    window.TravelRoutes.createAllRoutes(data);
+    data.days.forEach((_, idx) => {
+        if (idx > 0) {
+            window.TravelMarkers.toggleMarkersForDay(idx, false);
+            window.TravelRoutes.toggleRoutesForDay(idx, false);
         }
     });
-
-    // Fit map and controls
     fitMapToBounds(bounds, totalStops);
-    renderDayControls(data.days);
+    window.TravelControls.renderDayControls(data.days);
 
     debugLog("Trip rendering complete!");
-
-    // Reset mapReady flag for next itinerary
     mapReadySent = false;
 }
 
 /**
- * Remove all map artefacts before drawing a new itinerary
- */
-function clearMapElements() {
-    const { debugLog } = window.TravelHelpers;
-
-    if (window.TravelMarkers && window.TravelMarkers.clearAllMarkers) {
-        window.TravelMarkers.clearAllMarkers();
-    }
-    if (window.TravelRoutes && window.TravelRoutes.clearAllRoutes) {
-        window.TravelRoutes.clearAllRoutes();
-    }
-    if (window.TravelControls && window.TravelControls.clearDayControls) {
-        window.TravelControls.clearDayControls();
-    }
-
-    debugLog("Map elements cleared");
-}
-
-/**
- * Convenience util for other modules
+ * Is voice interface available?
  */
 function isVoiceAvailable() {
     return wsConnected && realtimeReady;
 }
 
-// Handle Google Maps script failures globally
+// Global error handler for Maps script failures
 window.addEventListener('error', function (e) {
     if (e.filename && e.filename.includes('maps.googleapis.com')) {
-        const { showError } = window.TravelOverlays;
-        const errMsg = e.message || (e.error && e.error.message) || 'Unknown script error';
-        console.error('Google Maps script error:', errMsg, e);
-
-        showError(`
-            <strong>Google Maps JavaScript failed to load</strong><br><br>
-            <code>${errMsg}</code><br><br>
-            • Check internet connectivity.<br>
-            • Verify the API Key / Client ID.<br>
-            • Ensure your quota hasn't been exceeded.<br><br>
-            See the browser console for the full stack trace.
+        console.error('Google Maps script error:', e.message || e.error.message, e);
+        window.TravelOverlays.showError(`
+            <strong>Google Maps JavaScript failed to load</strong><br>
+            <code>${e.message || e.error.message}</code>
         `);
     }
 }, true);
 
-// Public API for other modules
+// Expose public API
 window.TravelApp = {
     processItinerary,
     renderTripOnMap,
-    clearMapElements,
+    clearMapElements: () => {
+        window.TravelMarkers.clearAllMarkers();
+        window.TravelRoutes.clearAllRoutes();
+        window.TravelControls.clearDayControls();
+    },
     isVoiceAvailable
 };
