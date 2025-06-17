@@ -1,5 +1,5 @@
 // static/js/realtime/websocket_client.js
-// Improved WebSocket client with better error handling and retry logic
+// WebSocket client with OpenAI VAD event handling
 
 class WebSocketClient {
     constructor() {
@@ -37,14 +37,14 @@ class WebSocketClient {
 
                 // Connect to WebSocket namespace
                 this.socket = io(this.namespace, {
-                    transports: ['websocket', 'polling'], // Allow polling as fallback
+                    transports: ['websocket', 'polling'],
                     path: '/socket.io/', 
                     reconnection: true,
                     reconnectionAttempts: this.maxReconnectAttempts,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
                     timeout: 20000,
-                    forceNew: true // Force new connection
+                    forceNew: true
                 });
                 
                 // Set up event handlers
@@ -145,6 +145,17 @@ class WebSocketClient {
             this._triggerHandlers('session_update', data);
         });
         
+        // OpenAI VAD events - NEW
+        this.socket.on('speech_started', (data) => {
+            console.log('OpenAI VAD: Speech started event received');
+            this._triggerHandlers('speech_started', data);
+        });
+        
+        this.socket.on('speech_stopped', (data) => {
+            console.log('OpenAI VAD: Speech stopped event received');
+            this._triggerHandlers('speech_stopped', data);
+        });
+        
         // Audio/transcript events
         this.socket.on('transcript', (data) => {
             this._triggerHandlers('transcript', data);
@@ -152,6 +163,17 @@ class WebSocketClient {
         
         this.socket.on('audio_chunk', (data) => {
             this._triggerHandlers('audio_chunk', data);
+        });
+        
+        // Response events
+        this.socket.on('response_started', (data) => {
+            console.log('Response generation started');
+            this._triggerHandlers('response_started', data);
+        });
+        
+        this.socket.on('response_done', (data) => {
+            console.log('Response generation complete');
+            this._triggerHandlers('response_done', data);
         });
         
         // Itinerary events
@@ -169,10 +191,6 @@ class WebSocketClient {
         // Stats events
         this.socket.on('stats', (data) => {
             this._triggerHandlers('stats', data);
-        });
-        
-        this.socket.on('global_stats', (data) => {
-            this._triggerHandlers('global_stats', data);
         });
 
         // Handle interruption acknowledgment
@@ -203,20 +221,16 @@ class WebSocketClient {
     }
 
     sendAudioData(audioData) {
-    if (!audioData || audioData.byteLength === 0) return false;
-    // Base64-encode the chunk
-    const b64 = btoa(
-        String.fromCharCode.apply(null, new Uint8Array(audioData))
-    );
-        return this.emit('audio_data', { audio: b64 });
+        if (!audioData || audioData.length === 0) return false;
+        return this.emit('audio_data', { audio: audioData });
     }
 
     commitAudio() {
+        // Note: With server-side VAD, this might not be needed
         console.log('[WebSocketClient] Committing audio buffer...');
-        const success = this.emit('commit_audio', {});
-        console.log('[WebSocketClient] Commit audio result:', success);
-        return success;
-    }    
+        return this.emit('commit_audio', {});
+    }
+    
     clearAudio() {
         return this.emit('clear_audio', {});
     }

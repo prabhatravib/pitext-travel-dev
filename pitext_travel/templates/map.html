@@ -12,7 +12,6 @@
   <link rel="stylesheet" href="/static/css/controls.css" />
   <link rel="stylesheet" href="/static/css/panel.css" />
   <link rel="stylesheet" href="/static/css/chat.css" />
-  <link rel="stylesheet" href="/static/css/vad.css" />
 </head>
 
 <body>
@@ -24,11 +23,7 @@
     </div>
   </div>
 
-  <!---- indicators ---->
-  <div id="vad-indicator" class="vad-indicator">
-    <div class="pulse"></div><span>Listening…</span>
-  </div>
-
+  <!---- voice status indicator ---->
   <div id="voice-status" class="voice-status">
     <div class="voice-circle">
       <svg viewBox="0 0 24 24" width="24" height="24">
@@ -119,28 +114,110 @@
     };
   </script>
 
-  <!-- 4️⃣  Voice Components - Simple Loading -->
-  <script src="/static/js/realtime/vad_processor.js"></script>
+  <!-- 4️⃣  Voice Components - Simplified without VAD -->
   <script src="/static/js/realtime/audio_capture.js"></script>
   <script src="/static/js/realtime/audio_player.js"></script>
   <script src="/static/js/realtime/voice_state_machine.js"></script>
   <script src="/static/js/realtime/websocket_client.js"></script>
   <script src="/static/js/realtime/realtime_controller.js"></script>
   <script src="/static/js/chat.js"></script>
-  <script src="/static/js/vad_init.js"></script>
 
-  <!-- 5️⃣  Main application bootstrap -->
+  <!-- 5️⃣  Voice initialization -->
+  <script>
+    // Simple voice initialization without VAD
+    class VoiceChat {
+      constructor() {
+        this.controller = null;
+        this.statusEl = document.getElementById('voice-status');
+        this.statusText = document.querySelector('.status-text');
+        this.isReady = false;
+        this.initialize();
+      }
+      
+      async initialize() {
+        try {
+          this.updateStatus('Initializing...', 'initializing');
+          
+          this.controller = new window.RealtimeController();
+          this.setupEventHandlers();
+          
+          const initialized = await this.controller.initialize();
+          if (!initialized) throw new Error('Failed to initialize');
+          
+          this.updateStatus('Connecting...', 'connecting');
+          
+          const connected = await this.controller.connect();
+          if (!connected) throw new Error('Failed to connect');
+          
+          this.isReady = true;
+          this.updateStatus('Listening... Just speak naturally!', 'listening');
+          
+        } catch (error) {
+          console.error('Voice init failed:', error);
+          this.updateStatus('Voice unavailable', 'error');
+        }
+      }
+      
+      setupEventHandlers() {
+        this.controller.on('state_change', (event) => {
+          switch (event.to) {
+            case 'LISTENING':
+              this.updateStatus('Listening to you...', 'speaking');
+              break;
+            case 'PROCESSING':
+              this.updateStatus('Processing...', 'processing');
+              break;
+            case 'SPEAKING':
+              this.updateStatus('Assistant speaking...', 'assistant-speaking');
+              break;
+            case 'WAITING':
+              this.updateStatus('Listening... Just speak naturally!', 'listening');
+              break;
+          }
+        });
+        
+        this.controller.on('transcript', (data) => {
+          if (window.chatInstance) {
+            window.chatInstance.addBubble(data.role || 'assistant', data.text);
+          }
+        });
+        
+        this.controller.on('render_itinerary', (data) => {
+          console.log('Rendering itinerary:', data);
+          if (window.TravelApp && data.itinerary) {
+            window.TravelApp.renderTripOnMap(data.itinerary);
+          }
+        });
+      }
+      
+      updateStatus(text, className) {
+        if (this.statusText) this.statusText.textContent = text;
+        if (this.statusEl) {
+          this.statusEl.classList.remove('initializing', 'connecting', 'listening', 
+                                       'speaking', 'processing', 'assistant-speaking', 'error');
+          if (className) this.statusEl.classList.add(className);
+        }
+      }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.RealtimeController) {
+        window.voiceChat = new VoiceChat();
+      }
+    });
+  </script>
+
+  <!-- 6️⃣  Main application bootstrap -->
   <script src="/static/js/app.js"></script>
 
-  <!-- 6️⃣  Debug helper -->
+  <!-- 7️⃣  Debug helper -->
   <script>
     window.addEventListener('load', () =>
       setTimeout(() => console.log('[DEBUG]', {
-        socketIO          : !!window.io,
+        socketIO: !!window.io,
         realtimeController: !!window.RealtimeController,
-        vadProcessor      : !!window.VADProcessor,
-        continuousVoice   : !!window.continuousVoice
-      }), 2_000));
+        voiceChat: !!window.voiceChat
+      }), 2000));
   </script>
 </body>
 </html>

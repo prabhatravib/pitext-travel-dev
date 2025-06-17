@@ -35,11 +35,6 @@ class AudioHandler:
         self.input_lock = threading.Lock()
         self.output_lock = threading.Lock()
         
-        # Audio processing state
-        self.vad_active = False
-        self.silence_samples = 0
-        self.speech_samples = 0
-        
     def append_input_audio(self, audio_data: bytes):
         """Add raw audio data to input buffer.
         
@@ -174,59 +169,6 @@ class AudioHandler:
         except Exception as e:
             logger.error(f"Failed to resample audio: {e}")
             return audio_data
-    
-    def detect_silence(self, audio_data: bytes, threshold: float = 0.01) -> bool:
-        """Detect if audio contains silence.
-        
-        Args:
-            audio_data: PCM16 audio data
-            threshold: RMS threshold for silence detection
-            
-        Returns:
-            True if audio is mostly silence
-        """
-        try:
-            # Convert to numpy array
-            samples = np.frombuffer(audio_data, dtype=np.int16)
-            
-            # Calculate RMS (Root Mean Square)
-            rms = np.sqrt(np.mean(samples.astype(float) ** 2))
-            
-            # Normalize to 0-1 range
-            normalized_rms = rms / 32768.0
-            
-            return normalized_rms < threshold
-            
-        except Exception as e:
-            logger.error(f"Failed to detect silence: {e}")
-            return False
-    
-    def get_audio_level(self, audio_data: bytes) -> float:
-        """Get the current audio level (0.0 to 1.0).
-        
-        Args:
-            audio_data: PCM16 audio data
-            
-        Returns:
-            Audio level between 0.0 and 1.0
-        """
-        try:
-            samples = np.frombuffer(audio_data, dtype=np.int16)
-            
-            if len(samples) == 0:
-                return 0.0
-            
-            # Calculate RMS
-            rms = np.sqrt(np.mean(samples.astype(float) ** 2))
-            
-            # Normalize to 0-1 range
-            level = min(1.0, rms / 32768.0)
-            
-            return level
-            
-        except Exception as e:
-            logger.error(f"Failed to calculate audio level: {e}")
-            return 0.0
     
     def create_wav_header(self, data_size: int) -> bytes:
         """Create WAV file header for PCM16 audio.
