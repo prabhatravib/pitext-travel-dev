@@ -1,6 +1,5 @@
 // static/js/realtime/realtime_controller.js
-// Main controller that integrates audio capture, playback, and WebSocket communication
-// Uses OpenAI's server-side VAD
+// Main controller that integrates VAD, state machine, and WebSocket communication
 
 class RealtimeController {
     constructor() {
@@ -53,7 +52,7 @@ class RealtimeController {
             // Connect WebSocket
             await this.wsClient.connect();
             
-            // Start continuous audio capture
+            // Start audio capture with VAD
             this.audioCapture.start();
             
             this.isConnected = true;
@@ -85,17 +84,28 @@ class RealtimeController {
         this.isConnected = false;
         this._trigger('disconnected');
     }
-    
     _setupAudioCapture() {
-        // Continuous audio streaming to WebSocket
-        this.audioCapture.onAudioData = (pcm16) => {
-            if (this.isConnected) {
-                const b64 = this._arrayBufferToBase64(pcm16);
-                this.wsClient.sendAudioData(b64);
-            }
+        // raw PCM from VAD → WebSocket
+        this.audioCapture.onAudioData = (buf) => {
+          if (this.stateMachine.isInState('LISTENING')) {
+            const b64 = this._arrayBufferToBase64(buf);
+            this.wsClient.sendAudioData(b64);
+          }
         };
-    }
-    
+
+        this.audioCapture.onSpeechStart = () => {
+          if (this.audioPlayer.isActive()) {
+            this.audioPlayer.handleBargeIn();
+            this.wsClient.interrupt();
+          }
+          this.stateMachine.onSpeechDetected();
+        };
+
+        this.audioCapture.onSpeechEnd = () => {
+          this.wsClient.commitAudio();
+          this.stateMachine.onSpeechEnded();
+        };
+      }
     _setupAudioPlayer() {
         // Handle playback start
         this.audioPlayer.onPlaybackStart = (event) => {
@@ -108,6 +118,12 @@ class RealtimeController {
             console.log('TTS playback ended');
             this.stateMachine.onSpeechCompleted(event);
         };
+        
+        // Handle barge-in
+        this.audioPlayer.onBargeIn = (event) => {
+            console.log('Barge-in occurred');
+            this._trigger('barge_in', event);
+        };
     }
     
     _setupStateMachine() {
@@ -119,11 +135,12 @@ class RealtimeController {
         
         // State handlers
         this.stateMachine.on('onEnterListening', () => {
-            // OpenAI is now listening (based on their VAD)
+            // Clear any previous audio
+            this.wsClient.clearAudio();
         });
         
         this.stateMachine.on('onEnterProcessing', () => {
-            // OpenAI detected end of speech and is processing
+            // Audio has been committed, waiting for response
         });
         
         this.stateMachine.on('onEnterSpeaking', () => {
@@ -146,19 +163,6 @@ class RealtimeController {
             this.stateMachine.forceState('WAITING');
         });
         
-        // Handle OpenAI's VAD events
-        this.wsClient.on('speech_started', (data) => {
-            console.log('OpenAI VAD: Speech started');
-            this.stateMachine.onSpeechDetected(data);
-            this._trigger('speech_started', data);
-        });
-        
-        this.wsClient.on('speech_stopped', (data) => {
-            console.log('OpenAI VAD: Speech stopped');
-            this.stateMachine.onSpeechEnded(data);
-            this._trigger('speech_stopped', data);
-        });
-        
         // Handle transcripts
         this.wsClient.on('transcript', (data) => {
             this._trigger('transcript', data);
@@ -171,19 +175,23 @@ class RealtimeController {
             }
         });
         
-        // Handle interruption
-        this.wsClient.on('interrupted', (data) => {
-            console.log('User interrupted assistant');
-            this.audioPlayer.stop();
-            this._trigger('interrupted', data);
-        });
-        
         // Handle errors
         this.wsClient.on('error', (error) => {
             console.error('WebSocket error:', error);
             this.stateMachine.onProcessingError(error);
             this._trigger('error', { error });
         });
+        
+        this.wsClient.on('error', (err) => {
+            console.error('Realtime WS error', err);
+            if (String(err).includes('Connection to remote host was lost')) {
+                // ask controller to reconnect transparently
+                this.stateMachine.forceState('WAITING');
+                setTimeout(() => this.wsClient.connect(), 0);
+            }
+            this._trigger('error', { error: err });
+            });
+
         
         // Handle custom events (like render_itinerary)
         this.wsClient.on('render_itinerary', (data) => {
@@ -194,6 +202,14 @@ class RealtimeController {
     // Public methods
     
     /**
+     * Send text input (for testing or fallback)
+     */
+    sendText(text) {
+        // Not implemented in this example - would bypass VAD
+        console.log('Text input not implemented in VAD mode');
+    }
+    
+    /**
      * Get current state
      */
     getState() {
@@ -202,8 +218,16 @@ class RealtimeController {
             connected: this.isConnected,
             stateMachine: this.stateMachine.getState(),
             audioCapture: this.audioCapture.isActive(),
-            audioPlayer: this.audioPlayer.getPlaybackState()
+            audioPlayer: this.audioPlayer.getPlaybackState(),
+            vadState: this.audioCapture.getVADState()
         };
+    }
+    
+    /**
+     * Update VAD parameters
+     */
+    updateVADParams(params) {
+        this.audioCapture.updateVADParams(params);
     }
     
     // Event handling

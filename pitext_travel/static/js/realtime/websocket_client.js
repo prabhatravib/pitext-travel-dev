@@ -1,151 +1,254 @@
 // static/js/realtime/websocket_client.js
-// Improved WebSocket client – now forwards OpenAI’s server-side VAD events
-// (`speech_started` / `speech_stopped`) to the rest of the app.
+// Improved WebSocket client with better error handling and retry logic
 
 class WebSocketClient {
-  constructor() {
-    this.socket               = null;
-    this.connected            = false;
-    this.sessionId            = null;
-    this.namespace            = '/travel/ws';
-
-    this.reconnectAttempts    = 0;
-    this.maxReconnectAttempts = 5;
-    this.connectionTimeout    = 10_000;
-
-    this.eventHandlers        = {};   // { eventName → [fn, …] }
-    console.log('[WS] WebSocketClient created');
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Connection management                                             */
-  /* ------------------------------------------------------------------ */
-  connect() {
-    return new Promise((resolve, reject) => {
-      if (!window.io) return reject(new Error('Socket.IO not loaded'));
-
-      const timeout = setTimeout(
-        () => reject(new Error('WebSocket connection timeout')),
-        this.connectionTimeout
-      );
-
-      this.socket = io(this.namespace, {
-        transports:          ['websocket', 'polling'],
-        path:                '/socket.io/',
-        reconnection:        true,
-        reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay:    1_000,
-        reconnectionDelayMax: 5_000,
-        timeout:              20_000,
-        forceNew:             true
-      });
-
-      /* ---------- built-in events ---------- */
-      this.socket.on('connect', () => {
-        clearTimeout(timeout);
-        this.connected         = true;
+    constructor() {
+        this.socket = null;
+        this.connected = false;
+        this.sessionId = null;
+        
+        // Event handlers
+        this.eventHandlers = {};
+        
+        // Connection settings
+        this.namespace = '/travel/ws';
         this.reconnectAttempts = 0;
-        console.log('[WS] connected');
-        this._trigger('connected');
-        resolve();
-      });
+        this.maxReconnectAttempts = 5;
+        this.connectionTimeout = 10000; // 10 seconds
+        
+        console.log('WebSocketClient initialized');
+    }
+    
+    connect() {
+        return new Promise((resolve, reject) => {
+            // Check if Socket.IO is available
+            if (!window.io) {
+                reject(new Error('Socket.IO client library not loaded'));
+                return;
+            }
 
-      this.socket.on('connect_error', err => {
-        clearTimeout(timeout);
-        console.error('[WS] connect_error', err);
-        this.connected = false;
-        this.reconnectAttempts += 1;
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          reject(
-            new Error(`Failed after ${this.maxReconnectAttempts} attempts`)
-          );
+            try {
+                console.log(`Attempting to connect to ${this.namespace}...`);
+                
+                // Create connection with timeout
+                const timeoutId = setTimeout(() => {
+                    reject(new Error('Connection timeout'));
+                }, this.connectionTimeout);
+
+                // Connect to WebSocket namespace
+                this.socket = io(this.namespace, {
+                    transports: ['websocket', 'polling'], // Allow polling as fallback
+                    path: '/socket.io/', 
+                    reconnection: true,
+                    reconnectionAttempts: this.maxReconnectAttempts,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 20000,
+                    forceNew: true // Force new connection
+                });
+                
+                // Set up event handlers
+                this._setupEventHandlers();
+                
+                // Handle connection success
+                this.socket.on('connect', () => {
+                    clearTimeout(timeoutId);
+                    this.connected = true;
+                    this.reconnectAttempts = 0;
+                    console.log('WebSocket connected successfully');
+                    resolve();
+                });
+                
+                // Handle connection failure
+                this.socket.on('connect_error', (error) => {
+                    clearTimeout(timeoutId);
+                    console.error('WebSocket connection error:', error);
+                    this.connected = false;
+                    
+                    this.reconnectAttempts++;
+                    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                        reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
+                    }
+                });
+
+                // Handle disconnection
+                this.socket.on('disconnect', (reason) => {
+                    console.log('WebSocket disconnected:', reason);
+                    this.connected = false;
+                    this._triggerHandlers('disconnected', { reason });
+                });
+                
+            } catch (error) {
+                console.error('Failed to create WebSocket connection:', error);
+                reject(error);
+            }
+        });
+    }
+    
+    disconnect() {
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+            this.connected = false;
+            this.sessionId = null;
+            console.log('WebSocket disconnected');
         }
-      });
-
-      this.socket.on('disconnect', reason => {
-        console.warn('[WS] disconnected:', reason);
-        this.connected = false;
-        this._trigger('disconnected', { reason });
-      });
-
-      /* ---------- application events ---------- */
-      this._setupEventForwarding();
-    });
-  }
-
-  disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket  = null;
-      this.connected = false;
-      this.sessionId = null;
-      console.log('[WS] disconnected (manual)');
     }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  High-level emit helpers                                           */
-  /* ------------------------------------------------------------------ */
-  emit(evt, data = {}) {
-    if (!this.socket || !this.connected) {
-      console.error('[WS] emit while not connected:', evt);
-      return false;
+    
+    emit(event, data) {
+        if (!this.socket || !this.connected) {
+            console.error('Cannot emit - not connected to WebSocket');
+            return false;
+        }
+        
+        try {
+            this.socket.emit(event, data);
+            return true;
+        } catch (error) {
+            console.error('Failed to emit event:', error);
+            return false;
+        }
     }
-    try {
-      this.socket.emit(evt, data);
-      return true;
-    } catch (err) {
-      console.error('[WS] emit failed:', err);
-      return false;
+    
+    on(event, handler) {
+        if (!this.eventHandlers[event]) {
+            this.eventHandlers[event] = [];
+        }
+        this.eventHandlers[event].push(handler);
     }
-  }
+    
+    off(event, handler) {
+        if (this.eventHandlers[event]) {
+            this.eventHandlers[event] = this.eventHandlers[event].filter(
+                h => h !== handler
+            );
+        }
+    }
+    
+    _setupEventHandlers() {
+        if (!this.socket) return;
 
-  startSession()  { return this.emit('start_session'); }
-  sendAudioData(b64) { return this.emit('audio_data', { audio: b64 }); }
-  commitAudio()   { return this.emit('commit_audio'); }
-  interrupt()     { return this.emit('interrupt'); }
-  getStats()      { return this.emit('get_stats'); }
+        // Connection events
+        this.socket.on('connected', (data) => {
+            console.log('Session connected:', data);
+            this.sessionId = data.session_id;
+            this._triggerHandlers('connected', data);
+        });
+        
+        // Session events
+        this.socket.on('session_started', (data) => {
+            console.log('Realtime session started:', data);
+            this._triggerHandlers('session_started', data);
+        });
+        
+        this.socket.on('session_update', (data) => {
+            this._triggerHandlers('session_update', data);
+        });
+        
+        // Audio/transcript events
+        this.socket.on('transcript', (data) => {
+            this._triggerHandlers('transcript', data);
+        });
+        
+        this.socket.on('audio_chunk', (data) => {
+            this._triggerHandlers('audio_chunk', data);
+        });
+        
+        // Itinerary events
+        this.socket.on('render_itinerary', (data) => {
+            console.log('Received render_itinerary event:', data);
+            this._triggerHandlers('render_itinerary', data);
+        });
+        
+        // Error events
+        this.socket.on('error', (data) => {
+            console.error('WebSocket error event:', data);
+            this._triggerHandlers('error', data);
+        });
+        
+        // Stats events
+        this.socket.on('stats', (data) => {
+            this._triggerHandlers('stats', data);
+        });
+        
+        this.socket.on('global_stats', (data) => {
+            this._triggerHandlers('global_stats', data);
+        });
 
-  /* ------------------------------------------------------------------ */
-  /*  Event-handler registration                                        */
-  /* ------------------------------------------------------------------ */
-  on(evt, fn)  { (this.eventHandlers[evt] ??= []).push(fn); }
-  off(evt, fn) { this.eventHandlers[evt] =
-                   (this.eventHandlers[evt] || []).filter(f => f !== fn); }
+        // Handle interruption acknowledgment
+        this.socket.on('interrupted', (data) => {
+            console.log('Interruption acknowledged:', data);
+            this._triggerHandlers('interrupted', data);
+        });
+    }
+    
+    _triggerHandlers(event, data) {
+        const handlers = this.eventHandlers[event];
+        if (handlers) {
+            handlers.forEach(handler => {
+                try {
+                    handler(data);
+                } catch (error) {
+                    console.error(`Error in ${event} handler:`, error);
+                }
+            });
+        }
+    }
+    
+    // WebSocket API methods
+    
+    startSession() {
+        console.log('Starting Realtime session...');
+        return this.emit('start_session', {});
+    }
 
-  _trigger(evt, data) {
-    (this.eventHandlers[evt] || []).forEach(fn => {
-      try { fn(data); } catch (e) { console.error(`[WS] ${evt} handler`, e); }
-    });
-  }
+    sendAudioData(audioData) {
+    if (!audioData || audioData.byteLength === 0) return false;
+    // Base64-encode the chunk
+    const b64 = btoa(
+        String.fromCharCode.apply(null, new Uint8Array(audioData))
+    );
+        return this.emit('audio_data', { audio: b64 });
+    }
 
-  /* ------------------------------------------------------------------ */
-  /*  Forward server-side events from Socket.IO → internal bus          */
-  /* ------------------------------------------------------------------ */
-  _setupEventForwarding() {
-    if (!this.socket) return;
-
-    /* Session / diagnostics */
-    this.socket.on('connected',        d => { this.sessionId = d.session_id;
-                                              this._trigger('connected', d); });
-    this.socket.on('session_started',  d => this._trigger('session_started', d));
-    this.socket.on('session_update',   d => this._trigger('session_update',  d));
-
-    /* Speech & audio */
-    this.socket.on('transcript',       d => this._trigger('transcript',      d));
-    this.socket.on('audio_chunk',      d => this._trigger('audio_chunk',     d));
-
-    /* NEW – OpenAI server-side VAD events */
-    this.socket.on('speech_started',   d => this._trigger('speech_started',  d));
-    this.socket.on('speech_stopped',   d => this._trigger('speech_stopped',  d));
-
-    /* Misc */
-    this.socket.on('render_itinerary', d => this._trigger('render_itinerary',d));
-    this.socket.on('interrupted',      d => this._trigger('interrupted',     d));
-    this.socket.on('stats',            d => this._trigger('stats',           d));
-    this.socket.on('error',            d => this._trigger('error',           d));
-  }
+    commitAudio() {
+        console.log('[WebSocketClient] Committing audio buffer...');
+        const success = this.emit('commit_audio', {});
+        console.log('[WebSocketClient] Commit audio result:', success);
+        return success;
+    }    
+    clearAudio() {
+        return this.emit('clear_audio', {});
+    }
+    
+    interrupt() {
+        console.log('Sending interrupt signal...');
+        return this.emit('interrupt', {});
+    }
+    
+    getStats() {
+        return this.emit('get_stats', {});
+    }
+    
+    // Status methods
+    
+    isConnected() {
+        return this.connected && this.socket && this.socket.connected;
+    }
+    
+    getSessionId() {
+        return this.sessionId;
+    }
+    
+    getConnectionState() {
+        return {
+            connected: this.connected,
+            sessionId: this.sessionId,
+            reconnectAttempts: this.reconnectAttempts,
+            socketConnected: this.socket ? this.socket.connected : false
+        };
+    }
 }
 
-/* expose */
+// Export for use in other modules
 window.WebSocketClient = WebSocketClient;
