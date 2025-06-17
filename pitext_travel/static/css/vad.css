@@ -1,5 +1,5 @@
-/* VAD-based voice interface styles */
-.voice-status {
+/* Unified voice button with status */
+.voice-button {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
@@ -12,6 +12,19 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: all 0.3s ease;
     z-index: 10025;
+    cursor: pointer;
+    user-select: none;
+    border: none;
+    outline: none;
+}
+
+.voice-button:hover:not(.disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.voice-button:active:not(.disabled) {
+    transform: translateY(0);
 }
 
 .voice-circle {
@@ -24,43 +37,7 @@
     justify-content: center;
     position: relative;
     transition: all 0.3s ease;
-}
-
-/* Continuous pulsing when listening */
-.voice-status.listening .voice-circle {
-    animation: pulse-listen 2s infinite;
-}
-
-@keyframes pulse-listen {
-    0%, 100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 0.8;
-    }
-}
-
-/* Active speech detection */
-.voice-status.speaking .voice-circle {
-    background: #2196F3;
-    animation: pulse-speak 0.5s infinite;
-}
-
-@keyframes pulse-speak {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.2);
-    }
-}
-
-/* Assistant speaking */
-.voice-status.assistant-speaking .voice-circle {
-    background: #9C27B0;
-    animation: pulse-assistant 1s infinite;
+    flex-shrink: 0;
 }
 
 .voice-circle svg {
@@ -73,25 +50,100 @@
     font-size: 14px;
     color: #333;
     font-weight: 500;
+    white-space: nowrap;
 }
 
-/* VAD level indicator */
-.voice-level {
-    position: absolute;
-    bottom: -5px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 30px;
-    height: 4px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 2px;
-    overflow: hidden;
+/* State-based styling */
+.voice-button.initializing .voice-circle {
+    background: #9E9E9E;
 }
 
-.voice-level-bar {
-    height: 100%;
+.voice-button.connecting .voice-circle {
+    background: #FF9800;
+    animation: pulse-connecting 1s infinite;
+}
+
+.voice-button.listening .voice-circle {
     background: #4CAF50;
-    width: 0%;
-    transition: width 0.1s ease;
+    animation: pulse-listening 2s infinite;
 }
 
+.voice-button.speaking .voice-circle {
+    background: #2196F3;
+    animation: pulse-speaking 0.5s infinite;
+}
+
+.voice-button.processing .voice-circle {
+    background: #FF9800;
+    animation: pulse-processing 1.5s infinite;
+}
+
+.voice-button.assistant-speaking .voice-circle {
+    background: #9C27B0;
+    animation: pulse-assistant 1s infinite;
+}
+
+.voice-button.error .voice-circle {
+    background: #F44336;
+}
+
+.voice-button.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.voice-button.disabled .voice-circle {
+    background: #9E9E9E;
+}
+
+/* Animations */
+@keyframes pulse-connecting {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+@keyframes pulse-listening {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes pulse-speaking {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+@keyframes pulse-processing {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+@keyframes pulse-assistant {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.1); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.1); }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .voice-button {
+        bottom: 0.5rem;
+        right: 0.5rem;
+        padding: 0.4rem 0.8rem;
+        gap: 0.5rem;
+    }
+    
+    .voice-circle {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .voice-circle svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .status-text {
+        font-size: 13px;
+    }
+}

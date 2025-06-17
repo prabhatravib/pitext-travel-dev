@@ -24,26 +24,17 @@
     </div>
   </div>
 
-  <!---- voice status indicator ---->
-  <div id="voice-status" class="voice-status">
-    <div class="voice-circle">
-      <svg viewBox="0 0 24 24" width="24" height="24">
-        <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
-      </svg>
-    </div>
-    <span class="status-text">Initializing…</span>
-  </div>
-
-  <!---- single mic button ---->
-  <button id="mic-btn" class="mic-btn" title="Click to start voice chat" style="display: none;">
+<!---- unified voice button with status ---->
+<div id="voice-button" class="voice-button" title="Click to start voice chat">
+  <div class="voice-circle">
     <svg viewBox="0 0 24 24" width="24" height="24">
-      <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
+      <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 0 0 1 4-4z"/>
       <path d="M19 10a7 7 0 0 1-14 0"/>
       <path d="M12 19v4M8 23h8"/>
     </svg>
-  </button>
-
-  <!---- side-chat & controls ---->
+  </div>
+  <span class="status-text">Initializing…</span>
+</div>  <!---- side-chat & controls ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
 
   <div id="panel">
@@ -137,49 +128,33 @@
   <script src="/static/js/app.js"></script>
 
   <!-- 6️⃣  Voice initialization -->
+<!-- 6️⃣  Voice initialization -->
 <script>
-    // Voice initialization using the VoiceUIController
-    document.addEventListener('DOMContentLoaded', () => {
-      // Wait for all components to load
-      setTimeout(() => {
-        console.log('Checking for voice components...');
-        if (window.RealtimeController && window.VoiceUIController) {
-          console.log('Initializing voice UI controller...');
-          window.voiceUI = new VoiceUIController();
-          window.voiceUI.initialize().then(() => {
-            console.log('Voice UI ready');
-            // Force show the button again in case CSS is still overriding
-            const btn = document.getElementById('mic-btn');
-            if (btn) {
-              btn.style.display = 'flex';
-              console.log('Mic button should now be visible');
-            }
-          }).catch(err => {
-            console.error('Voice UI failed to initialize:', err);
-          });
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    console.log('Initializing unified voice UI...');
+    
+    if (window.VoiceUI && window.RealtimeController) {
+      window.voiceUI = new VoiceUI();
+      window.voiceUI.initialize().then(success => {
+        if (success) {
+          console.log('Unified voice UI ready');
         } else {
-          console.error('Required voice components not loaded:', {
-            RealtimeController: !!window.RealtimeController,
-            VoiceUIController: !!window.VoiceUIController
-          });
-          
-          // Hide voice elements if components failed to load
-          document.getElementById('voice-status').style.display = 'none';
-          document.getElementById('mic-btn').style.display = 'none';
+          console.error('Voice UI failed to initialize');
+          // Hide the button if initialization failed
+          const btn = document.getElementById('voice-button');
+          if (btn) btn.style.display = 'none';
         }
-      }, 2000); // Increased timeout
-    });
+      });
+    } else {
+      console.error('Required voice components not loaded');
+      // Hide the button if components missing
+      const btn = document.getElementById('voice-button');
+      if (btn) btn.style.display = 'none';
+    }
+  }, 1000);
+});
 </script>
-  <!-- 7️⃣  Debug helper -->
-  <script>
-    window.addEventListener('load', () =>
-      setTimeout(() => console.log('[DEBUG]', {
-        socketIO: !!window.io,
-        realtimeController: !!window.RealtimeController,
-        voiceUI: !!window.voiceUI
-      }), 3000));
-  </script>
-
   <!-- CSS fixes for mic button -->
   <style>
     .mic-btn {
