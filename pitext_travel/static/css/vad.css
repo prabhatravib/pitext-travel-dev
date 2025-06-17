@@ -95,7 +95,3 @@
     transition: width 0.1s ease;
 }
 
-/* Remove old mic button styles */
-.mic-btn {
-    display: none !important;
-}
