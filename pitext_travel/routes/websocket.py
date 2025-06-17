@@ -42,7 +42,6 @@ def _wire_realtime_callbacks(
                 },
                 room=sid,
                 namespace=namespace,
-                binary=False,
             )
         except Exception as exc:
             logger.exception("Failed emitting audio_chunk: %s", exc)
