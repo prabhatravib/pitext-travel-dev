@@ -37,33 +37,36 @@ class VoiceUIController {
             this.updateStatus('Voice unavailable', 'error');
         }
     }
-    
-    setupMicButton() {
-        if (!this.micBtn) {
-            console.warn('Mic button not found');
-            return;
-        }
-        
-        // Show the button
-        this.micBtn.style.display = 'flex';
-        
-        // Clear any existing listeners
-        this.micBtn.replaceWith(this.micBtn.cloneNode(true));
-        this.micBtn = document.getElementById('mic-btn');
-        
-        // Add click handler
-        this.micBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.toggleListening();
-        });
-        
-        // Update button appearance
-        this.updateMicButton();
-        
-        console.log('Mic button set up');
+setupMicButton() {
+    if (!this.micBtn) {
+        console.warn('Mic button not found');
+        return;
     }
     
+    // Show the button - use inline style to override CSS
+    this.micBtn.style.cssText = this.micBtn.style.cssText.replace('display: none', 'display: flex');
+    this.micBtn.style.display = 'flex';
+    
+    console.log('Mic button display style:', this.micBtn.style.display);
+    console.log('Mic button computed style:', window.getComputedStyle(this.micBtn).display);
+    
+    // Clear any existing listeners
+    this.micBtn.replaceWith(this.micBtn.cloneNode(true));
+    this.micBtn = document.getElementById('mic-btn');
+    
+    // Add click handler
+    this.micBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Mic button clicked!');
+        this.toggleListening();
+    });
+    
+    // Update button appearance
+    this.updateMicButton();
+    
+    console.log('Mic button set up successfully');
+}  
     updateMicButton() {
         if (!this.micBtn) return;
         
