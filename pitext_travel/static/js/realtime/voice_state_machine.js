@@ -1,13 +1,13 @@
 // static/js/realtime/voice_state_machine.js
-// State machine for managing voice conversation flow
+// State machine for managing voice conversation flow using OpenAI's VAD events
 
 class VoiceStateMachine {
     constructor() {
         // Define states
         this.States = {
-            WAITING: 'WAITING',        // Waiting for user speech
-            LISTENING: 'LISTENING',    // User is speaking
-            PROCESSING: 'PROCESSING',  // Processing user input
+            WAITING: 'WAITING',        // Waiting for user speech (OpenAI VAD will detect)
+            LISTENING: 'LISTENING',    // User is speaking (OpenAI VAD detected speech)
+            PROCESSING: 'PROCESSING',  // Processing user input (OpenAI VAD detected end)
             SPEAKING: 'SPEAKING'       // Assistant is speaking
         };
         
@@ -31,14 +31,6 @@ class VoiceStateMachine {
         this.onStateChange = null;
         this.onError = null;
         
-        // Timeout handling
-        this.timeouts = {
-            processing: 10000,  // Max 10s for processing
-            speaking: 30000,    // Max 30s for speaking
-            listening: 30000    // Max 30s for listening
-        };
-        this.currentTimeout = null;
-        
         // State history for debugging
         this.stateHistory = [];
         this.maxHistorySize = 50;
@@ -50,18 +42,15 @@ class VoiceStateMachine {
             },
             LISTENING: {
                 speechEnded: this.States.PROCESSING,
-                userInterrupt: this.States.WAITING,
-                timeout: this.States.PROCESSING
+                userInterrupt: this.States.WAITING
             },
             PROCESSING: {
                 responseStarted: this.States.SPEAKING,
-                processingFailed: this.States.WAITING,
-                timeout: this.States.WAITING
+                processingFailed: this.States.WAITING
             },
             SPEAKING: {
                 speechCompleted: this.States.WAITING,
-                userInterrupt: this.States.LISTENING,
-                timeout: this.States.WAITING
+                userInterrupt: this.States.LISTENING
             }
         };
         
@@ -84,11 +73,6 @@ class VoiceStateMachine {
         
         const toState = transitions[event];
         
-        // Validate transition
-        if (!this._validateTransition(fromState, toState, event)) {
-            return false;
-        }
-        
         // Execute transition
         this._executeTransition(fromState, toState, event, data);
         
@@ -101,9 +85,6 @@ class VoiceStateMachine {
      */
     _executeTransition(fromState, toState, event, data) {
         console.log(`State transition: ${fromState} -> ${toState} (event: ${event})`);
-        
-        // Clear any existing timeout
-        this._clearTimeout();
         
         // Call exit handler for current state
         const exitHandler = this.stateHandlers[`onExit${this._capitalizeFirst(fromState.toLowerCase())}`];
@@ -137,9 +118,6 @@ class VoiceStateMachine {
             }
         }
         
-        // Set timeout for new state
-        this._setStateTimeout(toState);
-        
         // Notify state change
         if (this.onStateChange) {
             this.onStateChange({
@@ -148,41 +126,6 @@ class VoiceStateMachine {
                 event,
                 data
             });
-        }
-    }
-    
-    /**
-     * Validate state transition
-     * @private
-     */
-    _validateTransition(fromState, toState, event) {
-        // Add any custom validation logic here
-        // For now, all defined transitions are valid
-        return true;
-    }
-    
-    /**
-     * Set timeout for current state
-     * @private
-     */
-    _setStateTimeout(state) {
-        const timeout = this.timeouts[state.toLowerCase()];
-        if (!timeout) return;
-        
-        this.currentTimeout = setTimeout(() => {
-            console.warn(`State ${state} timeout after ${timeout}ms`);
-            this.transition('timeout', { reason: 'State timeout' });
-        }, timeout);
-    }
-    
-    /**
-     * Clear current timeout
-     * @private
-     */
-    _clearTimeout() {
-        if (this.currentTimeout) {
-            clearTimeout(this.currentTimeout);
-            this.currentTimeout = null;
         }
     }
     
@@ -200,19 +143,20 @@ class VoiceStateMachine {
     }
     
     /**
-     * Handle speech detection event
+     * Handle speech detection event from OpenAI VAD
      */
     onSpeechDetected(data) {
         if (this.currentState === this.States.WAITING) {
             this.transition('speechDetected', data);
         } else if (this.currentState === this.States.SPEAKING) {
-            // Barge-in detected
+            // Barge-in detected - user started speaking while assistant was talking
+            console.log('User barge-in detected');
             this.transition('userInterrupt', { ...data, bargeIn: true });
         }
     }
     
     /**
-     * Handle speech end event
+     * Handle speech end event from OpenAI VAD
      */
     onSpeechEnded(data) {
         if (this.currentState === this.States.LISTENING) {
@@ -264,7 +208,6 @@ class VoiceStateMachine {
         
         console.warn(`Forcing state transition to ${state}`);
         
-        this._clearTimeout();
         this.previousState = this.currentState;
         this.currentState = state;
         
@@ -328,7 +271,6 @@ class VoiceStateMachine {
      * Reset state machine
      */
     reset() {
-        this._clearTimeout();
         this.currentState = this.States.WAITING;
         this.previousState = null;
         this.stateHistory = [];
@@ -351,7 +293,6 @@ class VoiceStateMachine {
         return {
             currentState: this.currentState,
             previousState: this.previousState,
-            hasTimeout: !!this.currentTimeout,
             historyLength: this.stateHistory.length,
             lastTransitions: this.stateHistory.slice(-5)
         };
