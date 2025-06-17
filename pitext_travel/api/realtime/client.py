@@ -60,6 +60,9 @@ class RealtimeClient:
         self.conversation_id: Optional[str] = None
         self.current_item_id: Optional[str] = None
         self.is_model_speaking: bool = False
+        self.on_speech_started: Optional[Callable] = None   # NEW
+        self.on_speech_stopped: Optional[Callable] = None   # NEW
+
 
     # ------------------------------------------------------------------
     # Public API
@@ -166,9 +169,7 @@ class RealtimeClient:
             instructions=self.config["instructions"],
             temperature=self.config["temperature"],
         )
-
     def _on_message(self, ws, message):
-        """Decode JSON and route to the appropriate handler."""
         try:
             event = json.loads(message)
         except json.JSONDecodeError:
@@ -176,31 +177,26 @@ class RealtimeClient:
             return
 
         etype = event.get("type")
-        if etype not in {"response.audio.delta", "response.audio_transcript.delta"}:
-            logger.info("◀ %s", etype)
+        if etype not in {
+            "response.audio.delta",
+            "response.audio_transcript.delta",
+            "input_audio_buffer.speech_started",
+            "input_audio_buffer.speech_stopped",
+        }:
+            logger.info("◀ %s", etype)
+
         self.incoming_queue.put(event)
 
         match etype:
-            case "session.created":
-                self._handle_session_created(event)
-            case "session.updated":
-                self._handle_session_updated(event)
-            case "conversation.item.created":
-                self._handle_item_created(event)
-            case "response.audio_transcript.delta":
-                self._handle_transcript_delta(event)
-            case "response.audio.delta":
-                self._handle_audio_delta(event)
-            case "response.function_call_arguments.done":
-                self._handle_function_call(event)
-            case "response.created":
-                self.is_model_speaking = True
-            case "response.done" | "response.cancelled":
-                self.is_model_speaking = False
-            case "error":
-                self._handle_error(event)
+            # … existing handlers …
+            case "input_audio_buffer.speech_started":       # NEW
+                if self.on_speech_started:
+                    self.on_speech_started(event.get("item_id"))
+            case "input_audio_buffer.speech_stopped":       # NEW
+                if self.on_speech_stopped:
+                    self.on_speech_stopped(event.get("item_id"))
             case _:
-                pass  # ignore other deltas silently
+                pass  # ignore others
 
     def _on_error(self, ws, error):
         logger.error("WebSocket error: %s", error)

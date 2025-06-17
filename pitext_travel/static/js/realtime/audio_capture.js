@@ -1,6 +1,7 @@
 /* ---------------------------------------------------------------------
    static/js/realtime/audio_capture.js
-   Voice-uplink: microphone → VAD → down-sample (if needed) → PCM16 bytes
+   Voice-uplink: microphone → down-sample (if needed) → PCM16 bytes
+   No VAD - continuous streaming to OpenAI
 --------------------------------------------------------------------- */
 
 // Target codec settings (must match the Realtime-API session)
@@ -9,7 +10,7 @@ const TARGET_CHANNELS    = 1;
 
 // Naïve but effective linear down-sampler (box filter)
 function downsampleTo24kHz(float32, inRate) {
-  if (inRate === TARGET_SAMPLE_RATE) return float32;               // nothing to do
+  if (inRate === TARGET_SAMPLE_RATE) return float32;
   const ratio   = inRate / TARGET_SAMPLE_RATE;
   const outLen  = Math.floor(float32.length / ratio);
   const out     = new Float32Array(outLen);
@@ -19,28 +20,25 @@ function downsampleTo24kHz(float32, inRate) {
     let   sum = 0;
     let   cnt = 0;
     while (readIdx < next) { sum += float32[readIdx++]; cnt++; }
-    out[i] = sum / cnt;                                           // box-filter average
+    out[i] = sum / cnt;
   }
   return out;
 }
 
 // ---------------------------------------------------------------------
-// Audio capture with VAD integration
+// Audio capture - continuous streaming
 // ---------------------------------------------------------------------
 class AudioCapture {
   constructor() {
     this.stream        = null;
     this.audioContext  = null;
     this.processorNode = null;
-    this.vadProcessor  = null;
     this.active        = false;
 
-    // Callbacks supplied by caller
+    // Callback for continuous audio streaming
     this.onAudioData   = null;  // (Int16Array pcm) => void
-    this.onSpeechStart = null;  // (evt) => void
-    this.onSpeechEnd   = null;  // (evt) => void
 
-    console.log('[AudioCapture] ctor');
+    console.log('[AudioCapture] ctor - continuous mode');
   }
 
   /* Convert Float32 [-1,1] → Int16 (-32768..32767) */
@@ -55,10 +53,8 @@ class AudioCapture {
 
   /* Public helpers --------------------------------------------------- */
   isActive() { return this.active; }
-  getVADState() { return this.vadProcessor ? this.vadProcessor.getState() : null; }
-  updateVADParams(p) { if (this.vadProcessor) this.vadProcessor.updateParams(p); }
 
-  /* Initialise mic + VAD -------------------------------------------- */
+  /* Initialise mic -------------------------------------------------- */
   async initialize() {
     try {
       /* 1️⃣  Ask for a mono mic stream, hinting 24 kHz. */
@@ -77,18 +73,10 @@ class AudioCapture {
         sampleRate: TARGET_SAMPLE_RATE
       });
 
-      // Some browsers ignore the request — log for debugging.
       console.log('[AudioCapture] AudioContext @', this.audioContext.sampleRate, 'Hz');
       if (this.audioContext.sampleRate !== TARGET_SAMPLE_RATE) {
         console.warn('[AudioCapture] Browser delivered a different rate; will down-sample.');
       }
-
-      /* 3️⃣  Set up VAD (web-worker / worklet you already include). */
-      this.vadProcessor = new window.VADProcessor({
-        sampleRate: TARGET_SAMPLE_RATE,
-        onSpeechStart: (e) => this.onSpeechStart && this.onSpeechStart(e),
-        onSpeechEnd:   (e) => this.onSpeechEnd   && this.onSpeechEnd(e)
-      });
 
       console.log('[AudioCapture] init OK');
       return true;
@@ -105,8 +93,7 @@ class AudioCapture {
 
     const sourceNode = this.audioContext.createMediaStreamSource(this.stream);
 
-    // Older browsers: ScriptProcessor; modern: AudioWorklet. ScriptProcessor
-    // is fine for a quick fix.
+    // ScriptProcessor for continuous audio streaming
     const BUFFER_SIZE = 2048;
     this.processorNode = this.audioContext.createScriptProcessor(
       BUFFER_SIZE,
@@ -117,26 +104,21 @@ class AudioCapture {
     this.processorNode.onaudioprocess = (event) => {
       const inputFloat = event.inputBuffer.getChannelData(0);
 
-      // VAD → decide if we're speaking
-      const vadResult = this.vadProcessor.processAudio(inputFloat);
+      // Down-sample if necessary
+      const float24 = downsampleTo24kHz(inputFloat, this.audioContext.sampleRate);
 
-      if (vadResult.isSpeaking) {
-        // Down-sample if necessary
-        const float24 = downsampleTo24kHz(inputFloat, this.audioContext.sampleRate);
+      // Convert to PCM16
+      const pcm16   = this._float32ToPCM16(float24);
 
-        // Convert to PCM16
-        const pcm16   = this._float32ToPCM16(float24);
-
-        // Ship it
-        if (this.onAudioData) this.onAudioData(pcm16);
-      }
+      // Ship it continuously
+      if (this.onAudioData) this.onAudioData(pcm16);
     };
 
     sourceNode.connect(this.processorNode);
     this.processorNode.connect(this.audioContext.destination); // required by ScriptProcessor
 
     this.active = true;
-    console.log('[AudioCapture] capture STARTED');
+    console.log('[AudioCapture] capture STARTED - continuous streaming');
   }
 
   /* Stop mic capture ------------------------------------------------- */
