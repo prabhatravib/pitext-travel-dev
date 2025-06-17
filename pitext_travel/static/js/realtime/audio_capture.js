@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------
    static/js/realtime/audio_capture.js
    Voice-uplink: microphone → down-sample (if needed) → PCM16 bytes
-   No VAD - continuous streaming to OpenAI
+   Continuous streaming to OpenAI (no client-side VAD)
 --------------------------------------------------------------------- */
 
 // Target codec settings (must match the Realtime-API session)
@@ -26,7 +26,7 @@ function downsampleTo24kHz(float32, inRate) {
 }
 
 // ---------------------------------------------------------------------
-// Audio capture - continuous streaming
+// Audio capture - continuous streaming (no VAD)
 // ---------------------------------------------------------------------
 class AudioCapture {
   constructor() {
@@ -38,7 +38,7 @@ class AudioCapture {
     // Callback for continuous audio streaming
     this.onAudioData   = null;  // (Int16Array pcm) => void
 
-    console.log('[AudioCapture] ctor - continuous mode');
+    console.log('[AudioCapture] ctor - continuous mode (no VAD)');
   }
 
   /* Convert Float32 [-1,1] → Int16 (-32768..32767) */
@@ -110,7 +110,7 @@ class AudioCapture {
       // Convert to PCM16
       const pcm16   = this._float32ToPCM16(float24);
 
-      // Ship it continuously
+      // Ship it continuously to OpenAI
       if (this.onAudioData) this.onAudioData(pcm16);
     };
 
