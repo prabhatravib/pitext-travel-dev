@@ -1,5 +1,5 @@
-// pitext_travel/static/js/ui/voice_ui.js
-// Voice UI controller that works with the existing RealtimeController
+// static/js/ui/voice_ui.js
+// Fixed Voice UI controller with proper button management
 
 class VoiceUIController {
     constructor() {
@@ -9,6 +9,7 @@ class VoiceUIController {
         this.micBtn = document.getElementById('mic-btn');
         this.isReady = false;
         this.isListening = false;
+        this.isAssistantSpeaking = false;
         
         console.log('VoiceUIController initialized');
     }
@@ -46,15 +47,52 @@ class VoiceUIController {
         // Show the button
         this.micBtn.style.display = 'flex';
         
+        // Clear any existing listeners
+        this.micBtn.replaceWith(this.micBtn.cloneNode(true));
+        this.micBtn = document.getElementById('mic-btn');
+        
         // Add click handler
-        this.micBtn.addEventListener('click', () => this.toggleListening());
+        this.micBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.toggleListening();
+        });
+        
+        // Update button appearance
+        this.updateMicButton();
         
         console.log('Mic button set up');
+    }
+    
+    updateMicButton() {
+        if (!this.micBtn) return;
+        
+        // Remove all state classes
+        this.micBtn.classList.remove('active', 'disabled', 'ready');
+        
+        if (!this.isReady) {
+            this.micBtn.classList.add('disabled');
+            this.micBtn.title = 'Voice not ready';
+        } else if (this.isAssistantSpeaking) {
+            this.micBtn.classList.add('disabled');
+            this.micBtn.title = 'Assistant is speaking...';
+        } else if (this.isListening) {
+            this.micBtn.classList.add('active');
+            this.micBtn.title = 'Click to stop listening';
+        } else {
+            this.micBtn.classList.add('ready');
+            this.micBtn.title = 'Click to start voice chat';
+        }
     }
     
     async toggleListening() {
         if (!this.isReady) {
             console.log('Voice UI not ready');
+            return;
+        }
+        
+        if (this.isAssistantSpeaking) {
+            console.log('Cannot toggle - assistant is speaking');
             return;
         }
         
@@ -64,7 +102,11 @@ class VoiceUIController {
             this.controller.disconnect();
             this.isListening = false;
             this.updateStatus('Ready - Click mic to start', 'ready');
-            this.micBtn?.classList.remove('active');
+            
+            // Disable audio capture
+            if (this.controller.audioCapture) {
+                this.controller.audioCapture.setEnabled(false);
+            }
         } else {
             // Start listening
             console.log('Starting voice chat...');
@@ -75,11 +117,17 @@ class VoiceUIController {
             if (connected) {
                 this.isListening = true;
                 this.updateStatus('Listening... Speak naturally!', 'listening');
-                this.micBtn?.classList.add('active');
+                
+                // Enable audio capture
+                if (this.controller.audioCapture) {
+                    this.controller.audioCapture.setEnabled(true);
+                }
             } else {
                 this.updateStatus('Connection failed - click to retry', 'error');
             }
         }
+        
+        this.updateMicButton();
     }
     
     setupEventHandlers() {
@@ -90,22 +138,41 @@ class VoiceUIController {
             switch (event.to) {
                 case 'LISTENING':
                     this.updateStatus('Listening to you...', 'speaking');
+                    this.isAssistantSpeaking = false;
                     break;
                 case 'PROCESSING':
                     this.updateStatus('Processing...', 'processing');
+                    // Disable audio sending during processing
+                    if (this.controller.audioCapture) {
+                        this.controller.audioCapture.setEnabled(false);
+                    }
                     break;
                 case 'SPEAKING':
                     this.updateStatus('Assistant speaking...', 'assistant-speaking');
+                    this.isAssistantSpeaking = true;
                     break;
                 case 'WAITING':
                     this.updateStatus('Listening... Speak naturally!', 'listening');
+                    this.isAssistantSpeaking = false;
+                    // Re-enable audio sending
+                    if (this.controller.audioCapture && this.isListening) {
+                        this.controller.audioCapture.setEnabled(true);
+                    }
                     break;
             }
+            
+            this.updateMicButton();
         });
         
         // Handle connection events
         this.controller.on('connected', () => {
             console.log('Voice connected successfully');
+        });
+        
+        // Handle session ready
+        this.controller.on('ready', () => {
+            console.log('Voice session ready');
+            this.updateStatus('Listening... Speak naturally!', 'listening');
         });
         
         // Handle transcripts
@@ -128,14 +195,16 @@ class VoiceUIController {
             console.error('Voice error:', error);
             this.updateStatus('Voice error - click to retry', 'error');
             this.isListening = false;
-            this.micBtn?.classList.remove('active');
+            this.isAssistantSpeaking = false;
+            this.updateMicButton();
         });
         
         // Handle disconnection
         this.controller.on('disconnected', () => {
             console.log('Voice disconnected');
             this.isListening = false;
-            this.micBtn?.classList.remove('active');
+            this.isAssistantSpeaking = false;
+            this.updateMicButton();
         });
     }
     
@@ -176,6 +245,7 @@ class VoiceUIController {
         return {
             isReady: this.isReady,
             isListening: this.isListening,
+            isAssistantSpeaking: this.isAssistantSpeaking,
             controller: this.controller ? this.controller.getState() : null
         };
     }

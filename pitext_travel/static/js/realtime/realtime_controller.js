@@ -87,15 +87,14 @@ class RealtimeController {
     }
     
     _setupAudioCapture() {
-        // Continuous audio streaming to WebSocket
-        this.audioCapture.onAudioData = (pcm16) => {
-            if (this.isConnected) {
-                const b64 = this._arrayBufferToBase64(pcm16);
-                this.wsClient.sendAudioData(b64);
-            }
-        };
-    }
-    
+            // Filtered audio streaming to WebSocket
+            this.audioCapture.onAudioData = (pcm16) => {
+                if (this.isConnected && this.audioCapture.isEnabled) {
+                    const b64 = this._arrayBufferToBase64(pcm16.buffer);
+                    this.wsClient.sendAudioData(b64);
+                }
+            };
+        }    
     _setupAudioPlayer() {
         // Handle playback start
         this.audioPlayer.onPlaybackStart = (event) => {

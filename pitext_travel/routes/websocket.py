@@ -285,9 +285,10 @@ def register_websocket_handlers(socketio):
             emit("error", {"message": f"Failed to start session: {str(exc)}"})
 
     # ----------------------------- AUDIO DATA -------------------------------- #
+# ----------------------------- AUDIO DATA -------------------------------- #
     @socketio.on("audio_data", namespace=NAMESPACE)
     def handle_audio_data(data):
-        """Handle audio data from browser."""
+        """Handle audio data from browser with improved logging."""
         session_id = session.get("realtime_session_id")
         if session_id is None:
             emit("error", {"message": "No session available"})
@@ -301,20 +302,30 @@ def register_websocket_handlers(socketio):
             if realtime_session and realtime_session.client:
                 audio_b64 = data.get("audio")
                 if not audio_b64:
-                    logger.warning("No audio data in payload")  # ADD THIS
-
+                    logger.warning("No audio data in payload")
                     return
-                audio_bytes = base64.b64decode(audio_b64)
-                logger.info(f"Sending audio to Realtime API, size: {len(audio_b64)}")  # ADD THIS
-
-                realtime_session.client.send_audio(audio_bytes)
-                manager.update_session_stats(session_id, audio_sent=len(audio_bytes))
+                
+                # Convert base64 to bytes for size calculation
+                try:
+                    audio_bytes = base64.b64decode(audio_b64)
+                    audio_size = len(audio_bytes)
+                    
+                    # Only log if audio data is substantial (not just silence)
+                    if audio_size > 100:  # Only log substantial audio chunks
+                        logger.debug(f"Sending audio to Realtime API, size: {audio_size} bytes")
+                    
+                    realtime_session.client.send_audio(audio_bytes)
+                    manager.update_session_stats(session_id, audio_sent=audio_size)
+                    
+                except Exception as decode_error:
+                    logger.error(f"Failed to decode audio data: {decode_error}")
+                    emit("error", {"message": "Invalid audio data"})
                 
         except Exception as exc:
             logger.exception("Error handling audio data: %s", exc)
             emit("error", {"message": "Failed to process audio"})
-
-    # ------------------------------ COMMIT AUDIO ----------------------------- #
+    
+        # ------------------------------ COMMIT AUDIO ----------------------------- #
     @socketio.on("commit_audio", namespace=NAMESPACE)
     def handle_commit_audio():
         """Commit audio buffer and request response."""

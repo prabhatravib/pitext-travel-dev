@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/static/css/controls.css" />
   <link rel="stylesheet" href="/static/css/panel.css" />
   <link rel="stylesheet" href="/static/css/chat.css" />
+  <link rel="stylesheet" href="/static/css/vad.css" />
 </head>
 
 <body>
@@ -32,14 +33,15 @@
     </div>
     <span class="status-text">Initializing…</span>
   </div>
-  <!---- mic button ---->
-<button id="mic-btn" class="mic-btn" title="Click to start/stop voice chat" style="display: none;">
-  <svg viewBox="0 0 24 24" width="24" height="24">
-    <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
-    <path d="M19 10a7 7 0 0 1-14 0"/>
-    <path d="M12 19v4M8 23h8"/>
-  </svg>
-</button>
+
+  <!---- single mic button ---->
+  <button id="mic-btn" class="mic-btn" title="Click to start voice chat" style="display: none;">
+    <svg viewBox="0 0 24 24" width="24" height="24">
+      <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
+      <path d="M19 10a7 7 0 0 1-14 0"/>
+      <path d="M12 19v4M8 23h8"/>
+    </svg>
+  </button>
 
   <!---- side-chat & controls ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
@@ -93,9 +95,7 @@
   <script src="/static/js/ui/overlays.js"></script>
   <script src="/static/js/ui/panel.js"></script>
   <script src="/static/js/ui/form.js"></script>
-  <script src="/static/js/ui/voice_ui.js"></script>  <!-- ADD THIS LINE -->
-
-
+  <script src="/static/js/ui/voice_ui.js"></script>
 
   <!-- 3️⃣  Google Maps + map helpers -->
   <script src="/static/js/map/google-maps.js"></script>
@@ -125,7 +125,7 @@
     };
   </script>
 
-  <!-- 4️⃣  Voice Components - Simplified without VAD -->
+  <!-- 4️⃣  Voice Components -->
   <script src="/static/js/realtime/audio_capture.js"></script>
   <script src="/static/js/realtime/audio_player.js"></script>
   <script src="/static/js/realtime/voice_state_machine.js"></script>
@@ -133,76 +133,36 @@
   <script src="/static/js/realtime/realtime_controller.js"></script>
   <script src="/static/js/chat.js"></script>
 
-  <!-- 5️⃣  Voice initialization -->
- <script>
-// Voice initialization using the new VoiceUIController
-document.addEventListener('DOMContentLoaded', () => {
-  if (window.RealtimeController && window.VoiceUIController) {
-    console.log('Initializing voice UI controller...');
-    window.voiceUI = new VoiceUIController();
-    window.voiceUI.initialize();
-  } else {
-    console.error('Required voice components not loaded');
-    setTimeout(() => {
-      console.log('Available components:', {
-        RealtimeController: !!window.RealtimeController,
-        VoiceUIController: !!window.VoiceUIController
-      });
-    }, 1000);
-  }
-});
-</script>
-  <!-- Add this to your map.html template, after the voice-status div -->
-
-<!-- Voice control button -->
-<button id="mic-btn" class="mic-btn" title="Click to talk">
-  <svg viewBox="0 0 24 24" width="24" height="24">
-    <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
-    <path d="M19 10a7 7 0 0 1-14 0"/>
-    <path d="M12 19v4M8 23h8"/>
-  </svg>
-</button>
-
-<!-- Update your CSS to show the mic button -->
-<style>
-.mic-btn {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #1976d2;
-  color: white;
-  border: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-  z-index: 10025;
-  display: flex !important; /* Override the display: none */
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.mic-btn:hover {
-  background: #1565c0;
-  transform: scale(1.1);
-}
-
-.mic-btn.active {
-  background: #d32f2f;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
-  70% { box-shadow: 0 0 0 20px rgba(211, 47, 47, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
-}
-</style>
-
-  <!-- 6️⃣  Main application bootstrap -->
+  <!-- 5️⃣  Main application bootstrap -->
   <script src="/static/js/app.js"></script>
+
+  <!-- 6️⃣  Voice initialization -->
+  <script>
+    // Voice initialization using the VoiceUIController
+    document.addEventListener('DOMContentLoaded', () => {
+      // Wait for all components to load
+      setTimeout(() => {
+        if (window.RealtimeController && window.VoiceUIController) {
+          console.log('Initializing voice UI controller...');
+          window.voiceUI = new VoiceUIController();
+          window.voiceUI.initialize().then(() => {
+            console.log('Voice UI ready');
+          }).catch(err => {
+            console.error('Voice UI failed to initialize:', err);
+          });
+        } else {
+          console.error('Required voice components not loaded:', {
+            RealtimeController: !!window.RealtimeController,
+            VoiceUIController: !!window.VoiceUIController
+          });
+          
+          // Hide voice elements if components failed to load
+          document.getElementById('voice-status').style.display = 'none';
+          document.getElementById('mic-btn').style.display = 'none';
+        }
+      }, 1000); // Give components time to load
+    });
+  </script>
 
   <!-- 7️⃣  Debug helper -->
   <script>
@@ -210,8 +170,63 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => console.log('[DEBUG]', {
         socketIO: !!window.io,
         realtimeController: !!window.RealtimeController,
-        voiceChat: !!window.voiceChat
-      }), 2000));
+        voiceUI: !!window.voiceUI
+      }), 3000));
   </script>
+
+  <!-- CSS fixes for mic button -->
+  <style>
+    .mic-btn {
+      position: fixed !important;
+      right: 1rem !important;
+      bottom: 1rem !important;
+      width: 56px !important;
+      height: 56px !important;
+      border-radius: 50% !important;
+      background: #4CAF50 !important;
+      color: white !important;
+      border: none !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+      cursor: pointer !important;
+      z-index: 10025 !important;
+      display: none !important; /* Hidden until ready */
+      align-items: center !important;
+      justify-content: center !important;
+      transition: all 0.3s ease !important;
+    }
+
+    .mic-btn:hover {
+      background: #45a049 !important;
+      transform: scale(1.1) !important;
+    }
+
+    .mic-btn.active {
+      background: #f44336 !important;
+      animation: pulse-recording 1.5s infinite !important;
+    }
+
+    .mic-btn.disabled {
+      background: #9e9e9e !important;
+      cursor: not-allowed !important;
+      opacity: 0.6 !important;
+    }
+
+    .mic-btn.ready {
+      background: #4CAF50 !important;
+      animation: pulse-ready 2s infinite !important;
+    }
+
+    @keyframes pulse-recording {
+      0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+      70% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+    }
+
+    @keyframes pulse-ready {
+      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+      70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+    }
+  </style>
 </body>
 </html>

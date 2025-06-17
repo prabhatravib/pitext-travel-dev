@@ -1,14 +1,16 @@
 /* ---------------------------------------------------------------------
    static/js/realtime/audio_capture.js
-   Voice-uplink: microphone → down-sample (if needed) → PCM16 bytes
-   Continuous streaming to OpenAI (no client-side VAD)
+   Voice-uplink: microphone → down-sample → PCM16 bytes with filtering
 --------------------------------------------------------------------- */
 
-// Target codec settings (must match the Realtime-API session)
+// Target codec settings
 const TARGET_SAMPLE_RATE = 24_000;
 const TARGET_CHANNELS    = 1;
 
-// Naïve but effective linear down-sampler (box filter)
+// Audio filtering to reduce feedback
+const SILENCE_THRESHOLD = 0.01;  // Minimum energy to consider as speech
+const MIN_AUDIO_LENGTH = 1024;   // Minimum samples before sending
+
 function downsampleTo24kHz(float32, inRate) {
   if (inRate === TARGET_SAMPLE_RATE) return float32;
   const ratio   = inRate / TARGET_SAMPLE_RATE;
@@ -25,20 +27,38 @@ function downsampleTo24kHz(float32, inRate) {
   return out;
 }
 
-// ---------------------------------------------------------------------
-// Audio capture - continuous streaming (no VAD)
-// ---------------------------------------------------------------------
 class AudioCapture {
   constructor() {
     this.stream        = null;
     this.audioContext  = null;
     this.processorNode = null;
     this.active        = false;
+    this.isEnabled     = false;  // NEW: Control when to actually send audio
 
-    // Callback for continuous audio streaming
-    this.onAudioData   = null;  // (Int16Array pcm) => void
+    // Audio filtering
+    this.audioBuffer   = [];
+    this.bufferSize    = 0;
+    this.lastSentTime  = 0;
+    this.sendInterval  = 100; // Send audio every 100ms maximum
 
-    console.log('[AudioCapture] ctor - continuous mode (no VAD)');
+    this.onAudioData   = null;
+
+    console.log('[AudioCapture] ctor - with audio filtering');
+  }
+
+  /* Calculate RMS energy of audio frame */
+  _calculateRMS(float32) {
+    let sum = 0;
+    for (let i = 0; i < float32.length; i++) {
+      sum += float32[i] * float32[i];
+    }
+    return Math.sqrt(sum / float32.length);
+  }
+
+  /* Check if audio contains speech */
+  _containsSpeech(float32) {
+    const energy = this._calculateRMS(float32);
+    return energy > SILENCE_THRESHOLD;
   }
 
   /* Convert Float32 [-1,1] → Int16 (-32768..32767) */
@@ -51,13 +71,20 @@ class AudioCapture {
     return pcm;
   }
 
-  /* Public helpers --------------------------------------------------- */
   isActive() { return this.active; }
+  
+  /* Enable/disable audio sending */
+  setEnabled(enabled) {
+    this.isEnabled = enabled;
+    if (!enabled) {
+      this.audioBuffer = [];
+      this.bufferSize = 0;
+    }
+    console.log('[AudioCapture] Audio sending', enabled ? 'ENABLED' : 'DISABLED');
+  }
 
-  /* Initialise mic -------------------------------------------------- */
   async initialize() {
     try {
-      /* 1️⃣  Ask for a mono mic stream, hinting 24 kHz. */
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate:   TARGET_SAMPLE_RATE,
@@ -68,17 +95,11 @@ class AudioCapture {
         }
       });
 
-      /* 2️⃣  Create (or reuse) an AudioContext; request 24 kHz. */
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
         sampleRate: TARGET_SAMPLE_RATE
       });
 
       console.log('[AudioCapture] AudioContext @', this.audioContext.sampleRate, 'Hz');
-      if (this.audioContext.sampleRate !== TARGET_SAMPLE_RATE) {
-        console.warn('[AudioCapture] Browser delivered a different rate; will down-sample.');
-      }
-
-      console.log('[AudioCapture] init OK');
       return true;
 
     } catch (err) {
@@ -87,13 +108,10 @@ class AudioCapture {
     }
   }
 
-  /* Start streaming mic frames -------------------------------------- */
   start() {
     if (this.active || !this.stream) return;
 
     const sourceNode = this.audioContext.createMediaStreamSource(this.stream);
-
-    // ScriptProcessor for continuous audio streaming
     const BUFFER_SIZE = 2048;
     this.processorNode = this.audioContext.createScriptProcessor(
       BUFFER_SIZE,
@@ -102,38 +120,68 @@ class AudioCapture {
     );
 
     this.processorNode.onaudioprocess = (event) => {
+      if (!this.isEnabled) return; // Don't process if disabled
+
       const inputFloat = event.inputBuffer.getChannelData(0);
+      
+      // Check if audio contains speech
+      if (!this._containsSpeech(inputFloat)) {
+        return; // Skip silent audio
+      }
 
       // Down-sample if necessary
       const float24 = downsampleTo24kHz(inputFloat, this.audioContext.sampleRate);
+      
+      // Add to buffer
+      this.audioBuffer.push(...float24);
+      this.bufferSize += float24.length;
 
-      // Convert to PCM16
-      const pcm16   = this._float32ToPCM16(float24);
-
-      // Ship it continuously to OpenAI
-      if (this.onAudioData) this.onAudioData(pcm16);
+      // Send buffered audio periodically
+      const now = Date.now();
+      if (now - this.lastSentTime > this.sendInterval && this.bufferSize >= MIN_AUDIO_LENGTH) {
+        this._sendBufferedAudio();
+        this.lastSentTime = now;
+      }
     };
 
     sourceNode.connect(this.processorNode);
-    this.processorNode.connect(this.audioContext.destination); // required by ScriptProcessor
+    this.processorNode.connect(this.audioContext.destination);
 
     this.active = true;
-    console.log('[AudioCapture] capture STARTED - continuous streaming');
+    console.log('[AudioCapture] capture STARTED with filtering');
   }
 
-  /* Stop mic capture ------------------------------------------------- */
+  _sendBufferedAudio() {
+    if (this.audioBuffer.length === 0 || !this.onAudioData) return;
+
+    const float32Array = new Float32Array(this.audioBuffer);
+    const pcm16 = this._float32ToPCM16(float32Array);
+    
+    // Clear buffer
+    this.audioBuffer = [];
+    this.bufferSize = 0;
+
+    // Send to backend
+    this.onAudioData(pcm16);
+  }
+
   stop() {
     if (!this.active) return;
+
+    // Send any remaining buffered audio
+    if (this.audioBuffer.length > 0) {
+      this._sendBufferedAudio();
+    }
 
     if (this.processorNode) {
       try { this.processorNode.disconnect(); } catch (_) {}
       this.processorNode = null;
     }
     this.active = false;
+    this.isEnabled = false;
     console.log('[AudioCapture] capture STOPPED');
   }
 
-  /* Cleanup everything ---------------------------------------------- */
   cleanup() {
     this.stop();
     if (this.audioContext && this.audioContext.state !== 'closed') {
@@ -145,5 +193,4 @@ class AudioCapture {
   }
 }
 
-/* Expose to window for other modules */
 window.AudioCapture = AudioCapture;
