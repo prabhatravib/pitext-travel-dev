@@ -32,6 +32,14 @@
     </div>
     <span class="status-text">Initializing…</span>
   </div>
+  <!---- mic button ---->
+<button id="mic-btn" class="mic-btn" title="Click to start/stop voice chat" style="display: none;">
+  <svg viewBox="0 0 24 24" width="24" height="24">
+    <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
+    <path d="M19 10a7 7 0 0 1-14 0"/>
+    <path d="M12 19v4M8 23h8"/>
+  </svg>
+</button>
 
   <!---- side-chat & controls ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
@@ -85,6 +93,9 @@
   <script src="/static/js/ui/overlays.js"></script>
   <script src="/static/js/ui/panel.js"></script>
   <script src="/static/js/ui/form.js"></script>
+  <script src="/static/js/ui/voice_ui.js"></script>  <!-- ADD THIS LINE -->
+
+
 
   <!-- 3️⃣  Google Maps + map helpers -->
   <script src="/static/js/map/google-maps.js"></script>
@@ -123,89 +134,72 @@
   <script src="/static/js/chat.js"></script>
 
   <!-- 5️⃣  Voice initialization -->
-  <script>
-    // Simple voice initialization without VAD
-    class VoiceChat {
-      constructor() {
-        this.controller = null;
-        this.statusEl = document.getElementById('voice-status');
-        this.statusText = document.querySelector('.status-text');
-        this.isReady = false;
-        this.initialize();
-      }
-      
-      async initialize() {
-        try {
-          this.updateStatus('Initializing...', 'initializing');
-          
-          this.controller = new window.RealtimeController();
-          this.setupEventHandlers();
-          
-          const initialized = await this.controller.initialize();
-          if (!initialized) throw new Error('Failed to initialize');
-          
-          this.updateStatus('Connecting...', 'connecting');
-          
-          const connected = await this.controller.connect();
-          if (!connected) throw new Error('Failed to connect');
-          
-          this.isReady = true;
-          this.updateStatus('Listening... Just speak naturally!', 'listening');
-          
-        } catch (error) {
-          console.error('Voice init failed:', error);
-          this.updateStatus('Voice unavailable', 'error');
-        }
-      }
-      
-      setupEventHandlers() {
-        this.controller.on('state_change', (event) => {
-          switch (event.to) {
-            case 'LISTENING':
-              this.updateStatus('Listening to you...', 'speaking');
-              break;
-            case 'PROCESSING':
-              this.updateStatus('Processing...', 'processing');
-              break;
-            case 'SPEAKING':
-              this.updateStatus('Assistant speaking...', 'assistant-speaking');
-              break;
-            case 'WAITING':
-              this.updateStatus('Listening... Just speak naturally!', 'listening');
-              break;
-          }
-        });
-        
-        this.controller.on('transcript', (data) => {
-          if (window.chatInstance) {
-            window.chatInstance.addBubble(data.role || 'assistant', data.text);
-          }
-        });
-        
-        this.controller.on('render_itinerary', (data) => {
-          console.log('Rendering itinerary:', data);
-          if (window.TravelApp && data.itinerary) {
-            window.TravelApp.renderTripOnMap(data.itinerary);
-          }
-        });
-      }
-      
-      updateStatus(text, className) {
-        if (this.statusText) this.statusText.textContent = text;
-        if (this.statusEl) {
-          this.statusEl.classList.remove('initializing', 'connecting', 'listening', 
-                                       'speaking', 'processing', 'assistant-speaking', 'error');
-          if (className) this.statusEl.classList.add(className);
-        }
-      }
-    }
-    
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.RealtimeController) {
-        window.voiceChat = new VoiceChat();
-      }
-    });
-  </script>
+ <script>
+// Voice initialization using the new VoiceUIController
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.RealtimeController && window.VoiceUIController) {
+    console.log('Initializing voice UI controller...');
+    window.voiceUI = new VoiceUIController();
+    window.voiceUI.initialize();
+  } else {
+    console.error('Required voice components not loaded');
+    setTimeout(() => {
+      console.log('Available components:', {
+        RealtimeController: !!window.RealtimeController,
+        VoiceUIController: !!window.VoiceUIController
+      });
+    }, 1000);
+  }
+});
+</script>
+  <!-- Add this to your map.html template, after the voice-status div -->
+
+<!-- Voice control button -->
+<button id="mic-btn" class="mic-btn" title="Click to talk">
+  <svg viewBox="0 0 24 24" width="24" height="24">
+    <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
+    <path d="M19 10a7 7 0 0 1-14 0"/>
+    <path d="M12 19v4M8 23h8"/>
+  </svg>
+</button>
+
+<!-- Update your CSS to show the mic button -->
+<style>
+.mic-btn {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #1976d2;
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  z-index: 10025;
+  display: flex !important; /* Override the display: none */
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.mic-btn:hover {
+  background: #1565c0;
+  transform: scale(1.1);
+}
+
+.mic-btn.active {
+  background: #d32f2f;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+  70% { box-shadow: 0 0 0 20px rgba(211, 47, 47, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+}
+</style>
 
   <!-- 6️⃣  Main application bootstrap -->
   <script src="/static/js/app.js"></script>
