@@ -1,5 +1,5 @@
 // static/js/realtime/audio_player.js
-// Audio playback for TTS from Realtime API
+// Audio playback for TTS from Realtime API with proper queuing
 
 class AudioPlayer {
     constructor() {
@@ -17,9 +17,8 @@ class AudioPlayer {
         this.onPlaybackEnd = null;
         this.onError = null;
         
-        // Playback state
-        this.nextStartTime = 0;
-        this.baseTime = 0;
+        // Processing state
+        this.isProcessingQueue = false;
         
         console.log('AudioPlayer initialized');
     }
@@ -76,59 +75,87 @@ class AudioPlayer {
             // Copy data to buffer
             audioBuffer.copyToChannel(float32Array, 0);
             
-            // Queue for playback
-            this._queueAudioBuffer(audioBuffer);
+            // Add to queue instead of playing immediately
+            this.audioQueue.push(audioBuffer);
+            
+            // Process queue if not already processing
+            if (!this.isProcessingQueue) {
+                this._processQueue();
+            }
             
         } catch (error) {
-            console.error('Failed to play audio:', error);
+            console.error('Failed to queue audio:', error);
             if (this.onError) {
                 this.onError(error);
             }
         }
     }
     
-    _queueAudioBuffer(audioBuffer) {
-        const currentTime = this.audioContext.currentTime;
-        
-        // Initialize timing if this is the first buffer
-        if (this.nextStartTime === 0) {
-            this.baseTime = currentTime;
-            this.nextStartTime = currentTime + 0.1; // Small delay to prevent glitches
+    async _processQueue() {
+        if (this.isProcessingQueue || this.audioQueue.length === 0) {
+            return;
         }
         
-        // Create buffer source
-        const source = this.audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(this.audioContext.destination);
+        this.isProcessingQueue = true;
         
-        // Schedule playback
-        source.start(this.nextStartTime);
+        while (this.audioQueue.length > 0) {
+            const audioBuffer = this.audioQueue.shift();
+            
+            try {
+                await this._playBuffer(audioBuffer);
+                
+                // Small gap between chunks to prevent clicks
+                await this._wait(10);
+                
+            } catch (error) {
+                console.error('Error playing buffer:', error);
+            }
+        }
         
-        // Update next start time
-        this.nextStartTime += audioBuffer.duration;
+        this.isProcessingQueue = false;
+        this.isPlaying = false;
         
-        // Handle playback events
-        source.onended = () => {
+        // Notify playback end
+        if (this.onPlaybackEnd) {
+            this.onPlaybackEnd();
+        }
+    }
+    
+    _playBuffer(audioBuffer) {
+        return new Promise((resolve) => {
+            // Create buffer source
+            const source = this.audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(this.audioContext.destination);
+            
+            // Handle end of playback
+            source.onended = () => {
+                this.currentSource = null;
+                resolve();
+            };
+            
+            // Start playback tracking
             if (!this.isPlaying) {
-                if (this.onPlaybackEnd) {
-                    this.onPlaybackEnd();
+                this.isPlaying = true;
+                if (this.onPlaybackStart) {
+                    this.onPlaybackStart();
                 }
             }
-        };
-        
-        // Start playback tracking
-        if (!this.isPlaying) {
-            this.isPlaying = true;
-            if (this.onPlaybackStart) {
-                this.onPlaybackStart();
-            }
-        }
-        
-        // Store reference
-        this.currentSource = source;
+            
+            // Store reference
+            this.currentSource = source;
+            
+            // Start playback immediately
+            source.start(0);
+        });
+    }
+    
+    _wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
     
     stop() {
+        // Stop current playback
         if (this.currentSource) {
             try {
                 this.currentSource.stop();
@@ -140,7 +167,7 @@ class AudioPlayer {
         
         // Clear queue
         this.audioQueue = [];
-        this.nextStartTime = 0;
+        this.isProcessingQueue = false;
         this.isPlaying = false;
         
         console.log('Audio playback stopped');
@@ -184,16 +211,16 @@ class AudioPlayer {
         return float32Array;
     }
     
-    getPlaybackTime() {
-        if (!this.audioContext || !this.isPlaying) {
-            return 0;
-        }
-        
-        return this.audioContext.currentTime - this.baseTime;
+    isActive() {
+        return this.isPlaying || this.audioQueue.length > 0;
     }
     
-    isActive() {
-        return this.isPlaying;
+    getPlaybackState() {
+        return {
+            isPlaying: this.isPlaying,
+            queueLength: this.audioQueue.length,
+            isProcessing: this.isProcessingQueue
+        };
     }
 }
 
