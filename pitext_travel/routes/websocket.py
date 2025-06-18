@@ -62,7 +62,6 @@ def _wire_realtime_callbacks(
         except Exception as exc:
             logger.exception("Failed emitting transcript: %s", exc)
 
-    # -- Enhanced function calls with better map integration -----------------
     def _on_function_call(call_id: str, name: str, args: dict) -> None:
         try:
             logger.info(f"🎤 Processing function call: {name} with args: {args}")
@@ -78,14 +77,12 @@ def _wire_realtime_callbacks(
                 # Enhanced handling for plan_trip
                 if name == "plan_trip" and result.get("success"):
                     logger.info("✅ Trip planned successfully via voice")
-
-                    # Store in Flask session for persistence
-                    flask_session = session                     
-                    flask_session['current_itinerary'] = result['itinerary']   
-                    flask_session['current_city']      = result['city']        
-                    flask_session['current_days']      = result['days']        
-                    flask_session.modified = True
-
+                    
+                    # Store in the realtime session's conversation data instead
+                    realtime_session.conversation_data['current_itinerary'] = result['itinerary']
+                    realtime_session.conversation_data['current_city'] = result['city']
+                    realtime_session.conversation_data['current_days'] = result['days']
+                    
                     # Emit to frontend with enhanced data
                     socketio.emit(
                         "render_itinerary",
@@ -93,29 +90,25 @@ def _wire_realtime_callbacks(
                             "itinerary": result.get("itinerary"),
                             "city": result.get("city"),
                             "days": result.get("days"),
-                            "source": "voice",  # Indicate this came from voice
+                            "source": "voice",
                             "timestamp": time.time()
                         },
                         room=sid,
                         namespace=namespace
                     )
                     
-                    # Also emit a map_ready check to ensure map is initialized
-                    socketio.emit(
-                        "check_map_ready",
-                        {},
-                        room=sid,
-                        namespace=namespace
-                    )
+                    logger.info(f"🗺️ Emitted render_itinerary for {result.get('city')}")
                     
-                    logger.info(f"🗺️ Emitted render_itinerary for {result.get('city')}")                  
                 # Enhanced handling for explain_day
                 elif name == "explain_day" and result.get("needs_session_data"):
-                    flask_session = session
-                    if 'current_itinerary' in flask_session:
+                    # Get data from realtime session's conversation data
+                    current_itinerary = realtime_session.conversation_data.get('current_itinerary')
+                    current_city = realtime_session.conversation_data.get('current_city', 'your destination')
+                    
+                    if current_itinerary:
                         voice_response = realtime_session.function_handler.format_explain_day_response(
-                            flask_session['current_itinerary'],
-                            flask_session.get('current_city', 'your destination'),
+                            current_itinerary,
+                            current_city,
                             result.get('day_number', 0)
                         )
                         
@@ -154,9 +147,7 @@ def _wire_realtime_callbacks(
                 "call_id": call_id,
                 "function": name
             }
-            realtime_session.client.send_function_result(call_id, error_result)
-
-    # -- error handling -------------------------------------------------------
+            realtime_session.client.send_function_result(call_id, error_result)    # -- error handling -------------------------------------------------------
     def _on_error(error: str) -> None:
         try:
             logger.error(f"🚫 Realtime API error: {error}")
@@ -432,12 +423,12 @@ def register_websocket_handlers(socketio):
             logger.exception("❌ Error handling interrupt: %s", exc)
 
     # ---------------------------- MAP READY ---------------------------------- #
-    @socketio.on("map_ready", namespace=NAMESPACE)
-    def handle_map_ready():
-        """Handle map ready event with better integration."""
-        session_id = session.get("realtime_session_id")
-        if not session_id:
-            return
+        @socketio.on("map_ready", namespace=NAMESPACE)
+        def handle_map_ready(data=None):  # Add data parameter with default
+            """Handle map ready event with better integration."""
+            session_id = session.get("realtime_session_id")
+            if not session_id:
+                return
             
         try:
             from pitext_travel.api.realtime.session_manager import get_session_manager

@@ -366,6 +366,10 @@ class RealtimeClient:
         )
 
     def send_function_result(self, call_id: str, result: Any):
+        if not self.is_connected:
+            logger.warning("Cannot send function result - not connected")
+            return
+            
         self._send_event(
             {
                 "type": "conversation.item.create",
@@ -376,4 +380,9 @@ class RealtimeClient:
                 },
             }
         )
+        
+        # Add a small delay before creating response to avoid conflicts
+        import time
+        time.sleep(0.1)
+        
         self._send_event({"type": "response.create"})
