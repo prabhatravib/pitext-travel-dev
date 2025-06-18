@@ -172,11 +172,6 @@ class VoiceUI {
                 case 'LISTENING':
                     this.updateStatus('👂 Listening to you...', 'speaking');
                     this.isAssistantSpeaking = false;
-                    
-                    // Notify chat system
-                    if (window.chatInstance) {
-                        window.chatInstance.handleVoiceStatus('listening');
-                    }
                     break;
                     
                 case 'PROCESSING':
@@ -184,19 +179,11 @@ class VoiceUI {
                     if (this.controller.audioCapture) {
                         this.controller.audioCapture.setEnabled(false);
                     }
-                    
-                    if (window.chatInstance) {
-                        window.chatInstance.handleVoiceStatus('processing');
-                    }
                     break;
                     
                 case 'SPEAKING':
                     this.updateStatus('🗣️ Assistant speaking...', 'assistant-speaking');
                     this.isAssistantSpeaking = true;
-                    
-                    if (window.chatInstance) {
-                        window.chatInstance.handleVoiceStatus('speaking');
-                    }
                     break;
                     
                 case 'WAITING':
@@ -206,10 +193,6 @@ class VoiceUI {
                     // Re-enable audio capture if still listening
                     if (this.controller.audioCapture && this.isListening) {
                         this.controller.audioCapture.setEnabled(true);
-                    }
-                    
-                    if (window.chatInstance) {
-                        window.chatInstance.handleVoiceStatus('ready');
                     }
                     break;
             }
@@ -266,11 +249,6 @@ class VoiceUI {
             this.isListening = false;
             this.isAssistantSpeaking = false;
             this.updateButtonState();
-            
-            // Show error in chat
-            if (window.chatInstance) {
-                window.chatInstance.handleError(error);
-            }
         });
         
         // Handle disconnection
