@@ -187,7 +187,10 @@ class WebSocketClient {
             console.error('WebSocket error event:', data);
             this._triggerHandlers('error', data);
         });
-        
+        // Map ready check
+        this.socket.on('check_map_ready', (data) => {
+            this._triggerHandlers('check_map_ready', data);
+        });
         // Stats events
         this.socket.on('stats', (data) => {
             this._triggerHandlers('stats', data);

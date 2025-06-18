@@ -94,6 +94,11 @@ function setupVoiceIntegration(realtimeController) {
     realtimeController.on('ready', () => {
         realtimeReady = true;
         debugLog("Realtime API ready for voice interaction");
+        
+        // Send map ready status if map is loaded
+        if (window.mapModulesReady && realtimeController.wsClient) {
+            realtimeController.wsClient.emit('map_ready', {});
+        }
     });
 
     // Event: error
@@ -105,27 +110,57 @@ function setupVoiceIntegration(realtimeController) {
         }
     });
 
-    // Event: itinerary data - THIS IS THE KEY INTEGRATION
+    // Event: itinerary data - ENHANCED INTEGRATION
     realtimeController.on('render_itinerary', (data) => {
         debugLog("🎤 Voice command generated itinerary:", data);
         
         if (data.itinerary) {
             tripData = data.itinerary;
             
-            // Ensure map is ready before rendering
-            if (window.mapModulesReady && window.TravelGoogleMaps.isMapLoaded()) {
-                debugLog("🗺️ Map ready, rendering itinerary immediately");
-                renderTripOnMap(data.itinerary);
-                
-                // Notify backend that map is ready for voice interaction
-                if (!mapReadySent && realtimeController.wsClient) {
-                    realtimeController.wsClient.emit('map_ready', {});
-                    mapReadySent = true;
+            // Force map rendering with retry logic
+            const attemptRender = (retries = 0) => {
+                if (window.mapModulesReady && window.TravelGoogleMaps && window.TravelGoogleMaps.isMapLoaded()) {
+                    debugLog("🗺️ Map ready, rendering itinerary immediately");
+                    
+                    // Clear any existing renders first
+                    if (window.TravelApp) {
+                        window.TravelApp.clearMapElements();
+                    }
+                    
+                    // Render the new itinerary
+                    renderTripOnMap(data.itinerary);
+                    
+                    // Update UI to show the map
+                    const mapOverlay = document.getElementById('map-overlay');
+                    if (mapOverlay) {
+                        mapOverlay.style.display = 'none';
+                    }
+                    
+                    // Hide the initial loading message
+                    const loadingDiv = document.querySelector('#map .loading');
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                    
+                } else if (retries < 10) {
+                    debugLog(`🗺️ Map not ready (attempt ${retries + 1}), retrying in 500ms...`);
+                    setTimeout(() => attemptRender(retries + 1), 500);
+                } else {
+                    errorLog("🗺️ Map failed to initialize after 10 attempts");
+                    window.TravelOverlays.showError("Map initialization failed. Please refresh the page.");
                 }
-            } else {
-                debugLog("🗺️ Map not ready, queuing itinerary for later render");
-                window.pendingRender = data.itinerary;
-            }
+            };
+            
+            // Start render attempts
+            attemptRender();
+        }
+    });
+
+    // Handle check_map_ready event
+    realtimeController.on('check_map_ready', () => {
+        if (window.mapModulesReady && window.TravelGoogleMaps.isMapLoaded() && !mapReadySent) {
+            realtimeController.wsClient.emit('map_ready', {});
+            mapReadySent = true;
         }
     });
 
@@ -137,9 +172,7 @@ function setupVoiceIntegration(realtimeController) {
     });
 
     debugLog("Voice integration setup complete");
-}
-
-/**
+}/**
  * Text chat fallback initialization
  */
 function initializeTextChatFallback() {

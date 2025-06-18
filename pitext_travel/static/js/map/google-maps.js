@@ -147,7 +147,22 @@ function initializeGoogleMap() {
   const { MAP_CONFIG, MAP_STYLES } = window.TravelConstants;
   const el = document.getElementById('map');
   
-  // Create the map
+// Hide the loading message once map is initialized
+const loadingDiv = document.querySelector('#map .loading');
+if (loadingDiv) {
+    loadingDiv.style.display = 'none';
+}
+
+// Trigger any pending voice renders
+setTimeout(() => {
+    if (window.pendingRender) {
+        console.log('Processing pending voice render after map init');
+        if (window.TravelApp && window.TravelApp.renderTripOnMap) {
+            window.TravelApp.renderTripOnMap(window.pendingRender);
+            window.pendingRender = null;
+        }
+    }
+}, 500);
 // Create the map
 map = new google.maps.Map(el, {
   center: MAP_CONFIG.DEFAULT_CENTER,
@@ -172,6 +187,7 @@ map = new google.maps.Map(el, {
   
   // Mark as loaded
   isGoogleMapsLoaded = true;
+
   
   console.log('Google Maps initialized successfully');
 }

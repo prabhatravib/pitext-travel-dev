@@ -100,8 +100,15 @@ def _wire_realtime_callbacks(
                         namespace=namespace
                     )
                     
-                    logger.info(f"🗺️ Emitted render_itinerary for {result.get('city')}")
+                    # Also emit a map_ready check to ensure map is initialized
+                    socketio.emit(
+                        "check_map_ready",
+                        {},
+                        room=sid,
+                        namespace=namespace
+                    )
                     
+                    logger.info(f"🗺️ Emitted render_itinerary for {result.get('city')}")                  
                 # Enhanced handling for explain_day
                 elif name == "explain_day" and result.get("needs_session_data"):
                     flask_session = session
