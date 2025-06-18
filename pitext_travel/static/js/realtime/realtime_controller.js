@@ -55,6 +55,7 @@ class RealtimeController {
             
             // Start continuous audio capture
             this.audioCapture.start();
+            this.audioCapture.setEnabled(true);  // Enable immediately
             
             this.isConnected = true;
             this._trigger('connected');

@@ -105,7 +105,7 @@ class AudioPlayer {
                 await this._playBuffer(audioBuffer);
                 
                 // Small gap between chunks to prevent clicks
-                await this._wait(10);
+                await this._wait(5);
                 
             } catch (error) {
                 console.error('Error playing buffer:', error);

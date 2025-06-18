@@ -176,9 +176,6 @@ class VoiceUI {
                     
                 case 'PROCESSING':
                     this.updateStatus('🧠 Processing your request...', 'processing');
-                    if (this.controller.audioCapture) {
-                        this.controller.audioCapture.setEnabled(false);
-                    }
                     break;
                     
                 case 'SPEAKING':
