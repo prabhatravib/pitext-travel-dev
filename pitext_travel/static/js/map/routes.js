@@ -24,8 +24,9 @@
 let currentPaths = [];
 
 /** Return the same colour the markers use for this day (0-based index). */
+/** Return the same colour the markers use for this day (0-based index). */
 function getRouteColour(dayIndex) {
-  return window.TravelGoogleMaps.getColourForDay(dayIndex + 1);
+  return window.TravelConstants.getColourForDay(dayIndex + 1);
 }
 
 // ---------- main “create all” entry point ----------

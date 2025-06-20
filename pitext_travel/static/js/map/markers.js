@@ -45,7 +45,7 @@ function createMarker(stop, day, dayIndex, stopIndex) {
   const map      = getMap();
 
   // Colour code for this day
-  const dayColor = getColourForDay(dayIndex);
+  const dayColor = window.TravelConstants.getColourForDay(dayIndex + 1);
 
   const pinElement = new google.maps.marker.PinElement({
     background: dayColor,

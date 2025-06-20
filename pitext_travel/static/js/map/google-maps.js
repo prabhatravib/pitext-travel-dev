@@ -141,6 +141,7 @@
         setMapView,
         getMapBounds,
         addMapListener,
-        getColourForDay
+        // Reference the function from constants instead
+        getColourForDay: window.TravelConstants.getColourForDay
     };
 })();
