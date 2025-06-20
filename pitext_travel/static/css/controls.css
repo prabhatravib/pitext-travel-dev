@@ -1,6 +1,6 @@
 /* static/css/controls.css - Form and Day Controls Styles */
 
-/* Trip Form Styles */
+/* Trip Form Styles (hidden when using hexagon interface) */
 #trip-form {
   display: flex;
   gap: 0.4rem;
@@ -59,46 +59,8 @@
   background-color: #5AA5BC;
 }
 
-/* Day Controls with Checkboxes */
-#day-controls {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 0.5rem;
-  padding: 0.5rem 0;
-  position: relative;
-  z-index: 10010;
-}
-
-#day-controls > div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-#day-controls label {
-  font-weight: bold;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-#day-controls label:hover {
-  opacity: 0.8;
-}
-
-#day-controls input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #4285f4;
-}
-
-#day-controls input[type="checkbox"]:hover {
-  transform: scale(1.1);
-}
+/* Day Controls - Handled by hexagon.css when using that interface */
+/* These styles are kept for backward compatibility but won't be used with hexagon interface */
 
 /* Old day toggle button styles (for backward compatibility) */
 .day-toggle {

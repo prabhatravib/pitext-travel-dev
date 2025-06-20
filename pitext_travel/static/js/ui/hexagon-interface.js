@@ -23,6 +23,9 @@ class HexagonInterface {
         // Hook into trip rendering events
         this.setupTripRenderingHooks();
         
+        // Initialize with default trip data to show day controls
+        this.initializeDefaultTrip();
+        
         // Initialize voice if available
         if (window.VoiceUI) {
             this.voiceController = new window.VoiceUI();
@@ -56,8 +59,8 @@ class HexagonInterface {
                 </button>
                 
                 <div class="hex-inputs">
-                    <input type="text" id="hex-city" placeholder="Paris" value="Paris">
-                    <input type="number" id="hex-days" placeholder="Days" value="3" min="1" max="14">
+                    <input type="text" id="hex-city" placeholder="City" value="Paris">
+                    <input type="number" id="hex-days" placeholder="3" value="3" min="1" max="14">
                 </div>
                 
                 <button class="hex-launch-button" id="hex-launch">Launch Trip</button>
@@ -72,6 +75,63 @@ class HexagonInterface {
         this.cityInput = document.getElementById('hex-city');
         this.daysInput = document.getElementById('hex-days');
         this.launchButton = document.getElementById('hex-launch');
+    }
+    
+    initializeDefaultTrip() {
+        // Create default day controls to show immediately
+        const dayControls = document.getElementById('day-controls');
+        if (!dayControls) {
+            console.warn('Day controls container not found');
+            return;
+        }
+        
+        // Create default 3-day controls
+        const defaultDays = [
+            { label: 'Day 1', color: '#FFADAD' },
+            { label: 'Day 2', color: '#FFD6A5' },
+            { label: 'Day 3', color: '#FDFFB6' }
+        ];
+        
+        // Clear any existing controls
+        dayControls.innerHTML = '';
+        dayControls.style.display = 'flex';
+        
+        // Create checkboxes for each day
+        defaultDays.forEach((day, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.style.display = 'flex';
+            wrapper.style.flexDirection = 'column';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.gap = '0.3rem';
+            
+            // Create label
+            const label = document.createElement('label');
+            label.style.color = day.color;
+            label.style.fontWeight = 'bold';
+            label.style.fontSize = '0.9rem';
+            label.textContent = day.label;
+            label.style.cursor = 'pointer';
+            label.setAttribute('for', `day-checkbox-${index}`);
+            
+            // Create checkbox
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `day-checkbox-${index}`;
+            checkbox.checked = index === 0; // Only first day checked by default
+            checkbox.style.cursor = 'pointer';
+            checkbox.style.width = '18px';
+            checkbox.style.height = '18px';
+            
+            // Disable until trip is loaded
+            checkbox.disabled = true;
+            label.style.opacity = '0.6';
+            
+            wrapper.appendChild(label);
+            wrapper.appendChild(checkbox);
+            dayControls.appendChild(wrapper);
+        });
+        
+        console.log('Default day controls created');
     }
     
     setupEventHandlers() {
@@ -89,6 +149,56 @@ class HexagonInterface {
         this.daysInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.launchTrip();
         });
+        
+        // Update day controls when days input changes
+        this.daysInput.addEventListener('change', () => this.updateDayControlsPreview());
+    }
+    
+    updateDayControlsPreview() {
+        const days = parseInt(this.daysInput.value, 10);
+        if (!days || days < 1 || days > 14) return;
+        
+        const dayControls = document.getElementById('day-controls');
+        if (!dayControls) return;
+        
+        // Clear existing controls
+        dayControls.innerHTML = '';
+        
+        // Create preview controls
+        for (let i = 0; i < days; i++) {
+            const wrapper = document.createElement('div');
+            wrapper.style.display = 'flex';
+            wrapper.style.flexDirection = 'column';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.gap = '0.3rem';
+            
+            const dayIndex = i + 1;
+            const color = window.TravelConstants ? window.TravelConstants.getColourForDay(dayIndex) : '#ccc';
+            
+            // Create label
+            const label = document.createElement('label');
+            label.style.color = color;
+            label.style.fontWeight = 'bold';
+            label.style.fontSize = '0.9rem';
+            label.textContent = `Day ${dayIndex}`;
+            label.style.cursor = 'pointer';
+            label.setAttribute('for', `day-checkbox-${i}`);
+            label.style.opacity = '0.6';
+            
+            // Create checkbox
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `day-checkbox-${i}`;
+            checkbox.checked = i === 0;
+            checkbox.disabled = true;
+            checkbox.style.cursor = 'pointer';
+            checkbox.style.width = '18px';
+            checkbox.style.height = '18px';
+            
+            wrapper.appendChild(label);
+            wrapper.appendChild(checkbox);
+            dayControls.appendChild(wrapper);
+        }
     }
     
     setupTripRenderingHooks() {
@@ -96,16 +206,23 @@ class HexagonInterface {
         const originalRenderTripOnMap = window.TravelApp ? window.TravelApp.renderTripOnMap : null;
         
         if (window.TravelApp && originalRenderTripOnMap) {
-            // Override renderTripOnMap to show day controls
+            // Override renderTripOnMap to ensure day controls stay visible
             window.TravelApp.renderTripOnMap = (data) => {
                 // Call original function
                 originalRenderTripOnMap.call(window.TravelApp, data);
                 
-                // Show day controls after trip is rendered
+                // Ensure day controls are visible and enabled
                 setTimeout(() => {
                     const dayControls = document.getElementById('day-controls');
                     if (dayControls) {
-                        dayControls.classList.add('visible');
+                        dayControls.style.display = 'flex';
+                        
+                        // Enable all checkboxes and labels
+                        const checkboxes = dayControls.querySelectorAll('input[type="checkbox"]');
+                        const labels = dayControls.querySelectorAll('label');
+                        
+                        checkboxes.forEach(cb => cb.disabled = false);
+                        labels.forEach(label => label.style.opacity = '1');
                     }
                 }, 100);
             };
@@ -115,7 +232,7 @@ class HexagonInterface {
         document.addEventListener('tripRendered', () => {
             const dayControls = document.getElementById('day-controls');
             if (dayControls) {
-                dayControls.classList.add('visible');
+                dayControls.style.display = 'flex';
             }
         });
     }
@@ -158,9 +275,8 @@ class HexagonInterface {
             if (data.city && data.days) {
                 this.cityInput.value = data.city;
                 this.daysInput.value = data.days;
+                this.updateDayControlsPreview();
             }
-            
-            // Day controls will show automatically when trip is rendered
         });
     }
     
@@ -212,8 +328,6 @@ class HexagonInterface {
         // Process the itinerary
         if (window.TravelApp && window.TravelApp.processItinerary) {
             await window.TravelApp.processItinerary(city, days);
-            
-            // Day controls will show automatically when trip is rendered
         }
     }
 }
@@ -222,9 +336,9 @@ class HexagonInterface {
 const shakeStyle = document.createElement('style');
 shakeStyle.textContent = `
     @keyframes shake {
-        0%, 100% { transform: translate(-50%, 50%) translateX(0); }
-        25% { transform: translate(-50%, 50%) translateX(-10px); }
-        75% { transform: translate(-50%, 50%) translateX(10px); }
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
     }
 `;
 document.head.appendChild(shakeStyle);

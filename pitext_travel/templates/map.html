@@ -21,29 +21,32 @@
   <div id="map">
     <div class="loading">
       <p>🗺️ Ready to plan your trip?</p>
-      <p><small>Enter a city & days, then click <em>Start Planning</em>.</small></p>
+      <p><small>Enter a city & days, then click <em>Launch Trip</em>.</small></p>
     </div>
   </div>
 
-<!---- unified voice button with status (hidden by hexagon.css) ---->
-<div id="voice-button" class="voice-button" title="Click to start voice chat">
-  <div class="voice-circle">
-    <svg viewBox="0 0 24 24" width="24" height="24">
-      <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
-      <path d="M19 10a7 7 0 0 1-14 0"/>
-      <path d="M12 19v4M8 23h8"/>
-    </svg>
+  <!---- unified voice button with status (hidden by hexagon.css) ---->
+  <div id="voice-button" class="voice-button" title="Click to start voice chat">
+    <div class="voice-circle">
+      <svg viewBox="0 0 24 24" width="24" height="24">
+        <path d="M12 2a4 4 0 0 1 4 4v6a4 4 0 1 1-8 0V6a4 4 0 0 1 4-4z"/>
+        <path d="M19 10a7 7 0 0 1-14 0"/>
+        <path d="M12 19v4M8 23h8"/>
+      </svg>
+    </div>
+    <span class="status-text">Initializing…</span>
   </div>
-  <span class="status-text">Initializing…</span>
-</div>  
 
-  <!---- side-chat & controls ---->
+  <!---- side-chat ---->
   <aside id="chat-panel" class="chat-panel" aria-live="polite"></aside>
 
-  <div id="panel">
+  <!---- Day controls (separate and always visible) ---->
+  <div id="day-controls"></div>
+
+  <!---- Hidden panel (not used with hexagon interface) ---->
+  <div id="panel" style="display: none;">
     <button id="minimize-btn" title="Minimize/Expand">−</button>
     <div id="inner-panel">
-      <div id="day-controls"></div>
       <form id="trip-form">
         <input id="city"  type="text"     placeholder="Enter city name" value="Paris" required />
         <input id="days"  type="number"   min="1" max="14" value="3"     required />
@@ -78,7 +81,7 @@
   <script async src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 
   <!-- Add this after google-maps.js -->
-<script src="/static/js/app/google-maps-init.js"></script>
+  <script src="/static/js/app/google-maps-init.js"></script>
 
   <!-- 4️⃣  Voice Components -->
   <script src="/static/js/realtime/audio_capture.js"></script>
