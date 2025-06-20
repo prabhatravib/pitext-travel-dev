@@ -1,0 +1,269 @@
+/* static/css/hexagon.css - Unified Hexagon Interface */
+
+.hexagon-interface {
+  position: fixed;
+  bottom: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  width: 320px;
+  height: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10040;
+  clip-path: polygon(50% 0%, 90% 25%, 90% 75%, 50% 100%, 10% 75%, 10% 25%);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.hexagon-interface::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, #00D4FF, #FF006E);
+  clip-path: polygon(50% 0%, 90% 25%, 90% 75%, 50% 100%, 10% 75%, 10% 25%);
+  z-index: -1;
+}
+
+.hexagon-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+/* Header text */
+.hexagon-header {
+  font-size: 1.1rem;
+  color: #fff;
+  text-align: center;
+  font-weight: 500;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin-bottom: 0.5rem;
+}
+
+/* Mic button in center */
+.hex-mic-button {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.hex-mic-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.hex-mic-button.listening {
+  animation: pulse-mic 2s infinite;
+  background: rgba(0, 212, 255, 0.3);
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+.hex-mic-button svg {
+  width: 32px;
+  height: 32px;
+  fill: #fff;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes pulse-mic {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 30px rgba(0, 212, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 212, 255, 0);
+  }
+}
+
+/* Input container */
+.hex-inputs {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  max-width: 240px;
+}
+
+.hex-inputs input {
+  flex: 1;
+  padding: 0.6rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.hex-inputs input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.5);
+}
+
+.hex-inputs input::placeholder {
+  color: #666;
+}
+
+/* Launch button */
+.hex-launch-button {
+  width: 100%;
+  max-width: 240px;
+  padding: 0.8rem;
+  background: linear-gradient(135deg, #00D4FF, #FF006E);
+  border: none;
+  border-radius: 25px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.hex-launch-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.hex-launch-button:active {
+  transform: translateY(0);
+}
+
+/* Hide original elements */
+#panel {
+  display: none !important;
+}
+
+#voice-button {
+  display: none !important;
+}
+
+/* Day controls - Initially hidden, shown after trip creation */
+#day-controls {
+  display: none !important;
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 10030;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+#day-controls.visible {
+  display: flex !important;
+}
+
+#day-controls > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+#day-controls label {
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+#day-controls label:hover {
+  opacity: 0.8;
+}
+
+#day-controls input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4285f4;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .hexagon-interface {
+    width: 280px;
+    height: 320px;
+    bottom: 40%;
+  }
+  
+  .hex-mic-button {
+    width: 70px;
+    height: 70px;
+  }
+  
+  .hex-mic-button svg {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .hex-inputs input {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+  }
+  
+  #day-controls {
+    bottom: 0.5rem;
+    left: 0.5rem;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* States */
+.hexagon-interface.processing {
+  animation: glow-process 2s ease-in-out infinite;
+}
+
+@keyframes glow-process {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+
+.hexagon-interface.speaking .hex-mic-button {
+  background: rgba(255, 0, 110, 0.3);
+  border-color: rgba(255, 0, 110, 0.5);
+  animation: pulse-speaking 1s infinite;
+}
+
+@keyframes pulse-speaking {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 110, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 20px rgba(255, 0, 110, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 110, 0);
+  }
+}
