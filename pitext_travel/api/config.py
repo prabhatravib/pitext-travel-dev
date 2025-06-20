@@ -2,6 +2,7 @@
 """Configuration management for the travel planner API."""
 import os
 from dotenv import load_dotenv
+from openai.types.beta.realtime.session import TurnDetection
 
 load_dotenv()
 
@@ -32,6 +33,15 @@ def get_render_mode():
     """Get render mode configuration."""
     return os.getenv("RENDER_MODE", "html")
 
+turn_cfg = TurnDetection(
+    # Option A – keep server VAD but shrink the timeout
+    type="server_vad",
+    threshold=0.45,           # a bit more sensitive
+    prefix_padding_ms=250,
+    silence_duration_ms=150,  # was 500
+    create_response=True,
+    interrupt_response=True,
+)
 
 # NEW: Realtime API Configuration
 def get_realtime_config():
@@ -54,6 +64,9 @@ def get_realtime_config():
         "session_timeout_seconds": int(os.getenv("REALTIME_SESSION_TIMEOUT_SECONDS", "600")),
         "max_concurrent_sessions": int(os.getenv("MAX_CONCURRENT_REALTIME_SESSIONS", "50")),
         "rate_limit_per_ip": int(os.getenv("REALTIME_RATE_LIMIT_PER_IP", "10")),
+        "turn_detection":turn_cfg,
+
+
         
         # Audio configuration
         "audio_format": {
