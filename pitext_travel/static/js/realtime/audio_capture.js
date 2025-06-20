@@ -39,7 +39,7 @@ class AudioCapture {
     this.audioBuffer   = [];
     this.bufferSize    = 0;
     this.lastSentTime  = 0;
-    this.sendInterval  = 50; // Send audio every 100ms maximum
+    this.sendInterval  = 25; // Send audio every 100ms maximum
 
     this.onAudioData   = null;
 
@@ -112,7 +112,7 @@ class AudioCapture {
     if (this.active || !this.stream) return;
 
     const sourceNode = this.audioContext.createMediaStreamSource(this.stream);
-    const BUFFER_SIZE = 2048;
+    const BUFFER_SIZE = 1024;
     this.processorNode = this.audioContext.createScriptProcessor(
       BUFFER_SIZE,
       TARGET_CHANNELS,
