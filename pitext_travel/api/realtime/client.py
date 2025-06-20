@@ -82,8 +82,8 @@ class RealtimeClient:
             self._thread = threading.Thread(
                 target=self._ws_app.run_forever,
                 kwargs={
-                    "ping_interval": 20,
-                    "ping_timeout": 10,
+                    "ping_interval": None,
+                    "ping_timeout": None,
                     "sslopt": {
                         "cert_reqs": ssl.CERT_REQUIRED,
                         "ca_certs": ssl.get_default_verify_paths().cafile
