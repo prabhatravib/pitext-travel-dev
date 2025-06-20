@@ -2,9 +2,9 @@ import concurrent.futures
 from flask import current_app
 import googlemaps
 # Corrected import path
-from pitext_travel.api.llm import Itinerary, Stop
+from pitext_travel.api.llm import generate_trip_itinerary, Stop
 
-def enhance_itinerary_with_geocoding(itinerary: Itinerary, gmaps: googlemaps.Client) -> Itinerary:
+def enhance_itinerary_with_geocoding(itinerary: generate_trip_itinerary, gmaps: googlemaps.Client) -> generate_trip_itinerary:
     """
     Enhances the itinerary by geocoding each stop to get coordinates and other details in parallel.
     """
