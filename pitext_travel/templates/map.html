@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/static/css/panel.css" />
   <link rel="stylesheet" href="/static/css/chat.css" />
   <link rel="stylesheet" href="/static/css/vad.css" />
+  <link rel="stylesheet" href="/static/css/hexagon.css" />
 </head>
 
 <body>
@@ -24,7 +25,7 @@
     </div>
   </div>
 
-<!---- unified voice button with status ---->
+<!---- unified voice button with status (hidden by hexagon.css) ---->
 <div id="voice-button" class="voice-button" title="Click to start voice chat">
   <div class="voice-circle">
     <svg viewBox="0 0 24 24" width="24" height="24">
@@ -68,9 +69,8 @@
   <script src="/static/js/ui/overlays.js"></script>
   <script src="/static/js/ui/panel.js"></script>
   <script src="/static/js/ui/form.js"></script>
-  <script src="/static/js/ui/voice_event_handlers.js"></script>
-  <script src="/static/js/ui/voice_event_handlers.js"></script>
   <script src="/static/js/ui/voice_ui.js"></script>
+  <script src="/static/js/ui/hexagon-interface.js"></script>
 
   <!-- 3️⃣  Google Maps + map helpers -->
   <script src="/static/js/map/google-maps.js"></script>
@@ -98,6 +98,16 @@
 
   <!-- 6️⃣  Voice initialization -->
   <script src="/static/js/ui/voice-initializer.js"></script>
+  
+  <!-- 7️⃣  Hexagon interface initialization -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const hexInterface = new HexagonInterface();
+        hexInterface.initialize();
+      }, 1000);
+    });
+  </script>
 
 </body>
 </html>
