@@ -37,3 +37,4 @@ eventlet>=0.34
 
 openai>=1.65.0,<2.0     # needed for TurnDetection, semantic VAD
 websockets>=12.0,<13.0  # matches OpenAI Realtime examples
+googlemaps

@@ -1,4 +1,4 @@
-"""OpenAI Realtime WebSocket client with built-in VAD event handling."""
+"""realtime/client.py: OpenAI Realtime WebSocket client with built-in VAD event handling."""
 
 from __future__ import annotations
 
@@ -141,7 +141,7 @@ class RealtimeClient:
         # Create session with server-side VAD
         self.update_session(
             input_audio_format="pcm16",
-            output_audio_format="pcm16",
+            output_audio_format="pcm_24000",
             instructions=self.config["instructions"],
             temperature=self.config["temperature"],
             turn_detection={

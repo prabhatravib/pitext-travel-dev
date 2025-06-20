@@ -88,7 +88,7 @@ def _generate_raw_itinerary(city, days):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.3,  # Lower temperature for more consistent place names
+        temperature=0.2,  # Lower temperature for more consistent place names
         max_tokens=1500,
         timeout=25
     )
