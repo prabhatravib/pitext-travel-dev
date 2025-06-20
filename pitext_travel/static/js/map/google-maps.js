@@ -1,175 +1,146 @@
-// static/js/map/route_fallback.js - Fallback Route Handling
-// Extracted from routes.js to handle polyline fallbacks
+// static/js/map/google-maps.js - Core Google Maps Initialization
+// Simplified version focusing on map setup without POI functionality
 
 (function() {
-    // Check if Google Maps API is loaded
-    if (!window.google || !window.google.maps) {
-        console.error('Google Maps API not fully loaded yet for route_fallback.js - retrying...');
-        setTimeout(function() {
-            const script = document.createElement('script');
-            script.src = '/static/js/map/route_fallback.js';
-            document.head.appendChild(script);
-        }, 100);
-        return;
+    // Day colour helper
+    const DAY_COLOR_MAP = {
+        1: '#FFADAD', 2: '#FFD6A5', 3: '#FDFFB6',
+        4: '#FFC4E1', 5: '#FFCC99', 6: '#FFB3AB', 7: '#FFECB3'
+    };
+    
+    function getColourForDay(dayIndex) {
+        if (DAY_COLOR_MAP[dayIndex]) return DAY_COLOR_MAP[dayIndex];
+        const hue = (dayIndex * 45) % 360;
+        return `hsl(${hue},70%,85%)`;
     }
 
-    /**
-     * Create a simple polyline when Directions API fails
-     */
-    function createSimplePolyline(stops, dayIndex) {
-        const { debugLog, createLatLng } = window.TravelHelpers;
-        const { getMap, getColourForDay } = window.TravelGoogleMaps;
-        const { isDayVisible } = window.TravelControls;
-
-        debugLog(`Drawing fallback polyline for Day ${dayIndex + 1}`);
-
-        const pathCoords = stops.map(s => createLatLng(s.lat, s.lng));
-        const routeColour = getColourForDay(dayIndex + 1);
-        const map = getMap();
-
-        const polyline = new google.maps.Polyline({
-            path: pathCoords,
-            geodesic: true,
-            strokeColor: routeColour,
-            strokeOpacity: 0.8,
-            strokeWeight: 4
-        });
-
-        polyline.dayIndex = dayIndex;
-        polyline.setMap(isDayVisible(dayIndex) ? map : null);
-
-        return polyline;
-    }
+    // Map instance and services
+    let map = null;
+    let directionsService = null;
+    let isGoogleMapsLoaded = false;
 
     /**
-     * Create curved polyline for better visual appeal
+     * Initialize Google Maps
      */
-    function createCurvedPolyline(stops, dayIndex) {
-        const { debugLog, createLatLng } = window.TravelHelpers;
-        const { getMap, getColourForDay } = window.TravelGoogleMaps;
-        const { isDayVisible } = window.TravelControls;
-
-        debugLog(`Drawing curved fallback polyline for Day ${dayIndex + 1}`);
-
-        // Create curved path using bezier-like interpolation
-        const pathCoords = [];
-        
-        for (let i = 0; i < stops.length - 1; i++) {
-            const start = createLatLng(stops[i].lat, stops[i].lng);
-            const end = createLatLng(stops[i + 1].lat, stops[i + 1].lng);
-            
-            // Add start point
-            pathCoords.push(start);
-            
-            // Add intermediate curved points
-            const steps = 10;
-            for (let j = 1; j < steps; j++) {
-                const t = j / steps;
-                const lat = start.lat + (end.lat - start.lat) * t;
-                const lng = start.lng + (end.lng - start.lng) * t;
-                
-                // Add slight curve
-                const offset = Math.sin(t * Math.PI) * 0.001;
-                pathCoords.push(createLatLng(lat + offset, lng + offset));
-            }
-        }
-        
-        // Add final point
-        pathCoords.push(createLatLng(
-            stops[stops.length - 1].lat, 
-            stops[stops.length - 1].lng
-        ));
-
-        const routeColour = getColourForDay(dayIndex + 1);
-        const map = getMap();
-
-        const polyline = new google.maps.Polyline({
-            path: pathCoords,
-            geodesic: true,
-            strokeColor: routeColour,
-            strokeOpacity: 0.8,
-            strokeWeight: 4
-        });
-
-        polyline.dayIndex = dayIndex;
-        polyline.setMap(isDayVisible(dayIndex) ? map : null);
-
-        return polyline;
-    }
-
-    /**
-     * Create dashed polyline for alternative style
-     */
-    function createDashedPolyline(stops, dayIndex) {
-        const { debugLog, createLatLng } = window.TravelHelpers;
-        const { getMap, getColourForDay } = window.TravelGoogleMaps;
-        const { isDayVisible } = window.TravelControls;
-
-        debugLog(`Drawing dashed fallback polyline for Day ${dayIndex + 1}`);
-
-        const pathCoords = stops.map(s => createLatLng(s.lat, s.lng));
-        const routeColour = getColourForDay(dayIndex + 1);
-        const map = getMap();
-
-        // Define the dashed line symbol
-        const lineSymbol = {
-            path: 'M 0,-1 0,1',
-            strokeOpacity: 1,
-            scale: 4
-        };
-
-        const polyline = new google.maps.Polyline({
-            path: pathCoords,
-            geodesic: true,
-            strokeColor: routeColour,
-            strokeOpacity: 0,
-            icons: [{
-                icon: lineSymbol,
-                offset: '0',
-                repeat: '20px'
-            }]
-        });
-
-        polyline.dayIndex = dayIndex;
-        polyline.setMap(isDayVisible(dayIndex) ? map : null);
-
-        return polyline;
-    }
-
-    /**
-     * Handle Directions API error and choose appropriate fallback
-     */
-    function handleDirectionsError(status, stops, dayIndex) {
+    function initializeGoogleMap() {
+        const { MAP_CONFIG, MAP_STYLES } = window.TravelConstants;
         const { debugLog } = window.TravelHelpers;
         
-        debugLog(`Directions API failed with status: ${status}`);
-        
-        // Choose fallback based on error type
-        switch (status) {
-            case 'ZERO_RESULTS':
-                // No route found - use simple polyline
-                return createSimplePolyline(stops, dayIndex);
-                
-            case 'OVER_QUERY_LIMIT':
-                // Rate limited - use curved polyline
-                return createCurvedPolyline(stops, dayIndex);
-                
-            case 'REQUEST_DENIED':
-            case 'INVALID_REQUEST':
-                // API issues - use dashed polyline
-                return createDashedPolyline(stops, dayIndex);
-                
-            default:
-                // Unknown error - use simple polyline
-                return createSimplePolyline(stops, dayIndex);
+        const mapElement = document.getElementById('map');
+        if (!mapElement) {
+            console.error('Map element not found');
+            return;
+        }
+
+        // Hide the loading message once map is initialized
+        const loadingDiv = document.querySelector('#map .loading');
+        if (loadingDiv) {
+            loadingDiv.style.display = 'none';
+        }
+
+        // Create the map
+        map = new google.maps.Map(mapElement, {
+            center: MAP_CONFIG.DEFAULT_CENTER,
+            zoom: MAP_CONFIG.DEFAULT_ZOOM,
+            mapId: MAP_CONFIG.MAP_ID,
+            mapTypeControl: true,
+            zoomControl: true,
+            scaleControl: true,
+            streetViewControl: true,
+            fullscreenControl: true,
+            styles: MAP_STYLES
+        });
+
+        // Initialize directions service
+        directionsService = new google.maps.DirectionsService();
+
+        // Mark as loaded
+        isGoogleMapsLoaded = true;
+
+        debugLog('Google Maps initialized successfully');
+
+        // Fire custom event
+        document.dispatchEvent(new CustomEvent('mapsApiReady', {
+            detail: { map: map }
+        }));
+
+        // Process any pending renders
+        if (window.pendingRender) {
+            debugLog('Processing pending render after map init');
+            setTimeout(() => {
+                if (window.TravelApp && window.TravelApp.renderTripOnMap) {
+                    window.TravelApp.renderTripOnMap(window.pendingRender);
+                    window.pendingRender = null;
+                }
+            }, 500);
         }
     }
 
-    // Export functions for use in routes.js
-    window.TravelRouteFallback = {
-        createSimplePolyline,
-        createCurvedPolyline,
-        createDashedPolyline,
-        handleDirectionsError
+    /**
+     * Fit map bounds to show all markers
+     */
+    function fitMapToBounds(bounds, totalStops) {
+        const { MAP_CONFIG } = window.TravelConstants;
+        const { debugLog } = window.TravelHelpers;
+        
+        if (!map || !bounds || bounds.isEmpty() || !totalStops) {
+            debugLog('Cannot fit bounds - invalid parameters');
+            return;
+        }
+
+        map.fitBounds(bounds);
+        
+        // Adjust zoom after bounds change
+        google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+            const currentZoom = map.getZoom();
+            
+            if (currentZoom > MAP_CONFIG.MAX_ZOOM) {
+                map.setZoom(MAP_CONFIG.COMFORTABLE_ZOOM);
+            } else if (currentZoom < MAP_CONFIG.MIN_ZOOM) {
+                map.setZoom(MAP_CONFIG.OVERVIEW_ZOOM);
+            }
+        });
+    }
+
+    /**
+     * Set map center and zoom
+     */
+    function setMapView(center, zoom) {
+        if (!map) return;
+        
+        if (center) {
+            map.setCenter(center);
+        }
+        if (zoom) {
+            map.setZoom(zoom);
+        }
+    }
+
+    /**
+     * Get current map bounds
+     */
+    function getMapBounds() {
+        return map ? map.getBounds() : null;
+    }
+
+    /**
+     * Add a map listener
+     */
+    function addMapListener(event, callback) {
+        if (!map) return null;
+        return map.addListener(event, callback);
+    }
+
+    // Export public API
+    window.TravelGoogleMaps = {
+        initializeGoogleMap,
+        getMap: () => map,
+        getDirectionsService: () => directionsService,
+        isMapLoaded: () => isGoogleMapsLoaded,
+        fitMapToBounds,
+        setMapView,
+        getMapBounds,
+        addMapListener,
+        getColourForDay
     };
 })();
