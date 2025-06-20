@@ -68,6 +68,8 @@
   <script src="/static/js/ui/overlays.js"></script>
   <script src="/static/js/ui/panel.js"></script>
   <script src="/static/js/ui/form.js"></script>
+  <script src="/static/js/ui/voice_event_handlers.js"></script>
+  <script src="/static/js/ui/voice_event_handlers.js"></script>
   <script src="/static/js/ui/voice_ui.js"></script>
 
   <!-- 3️⃣  Google Maps + map helpers -->
@@ -79,12 +81,17 @@
   <script src="/static/js/realtime/audio_capture.js"></script>
   <script src="/static/js/realtime/audio_player.js"></script>
   <script src="/static/js/realtime/voice_state_machine.js"></script>
+  <script src="/static/js/realtime/websocket_connection.js"></script>
+  <script src="/static/js/realtime/websocket_event_setup.js"></script>
   <script src="/static/js/realtime/websocket_client.js"></script>
-  <script src="/static/js/realtime/realtime_controller.js"></script>
+  <script src="/static/js/realtime/setup.js"></script>
+  <script src="/static/js/realtime/controller.js"></script>
   <script src="/static/js/chat.js"></script>
 
-  <!-- 5️⃣  Main application bootstrap -->
-  <script src="/static/js/app.js"></script>
+  <!-- 5️⃣  Application Core (refactored) -->
+  <script src="/static/js/app/initializer.js"></script>
+  <script src="/static/js/app/coordinator.js"></script>
+  <script src="/static/js/app/main.js"></script>
 
   <!-- 6️⃣  Voice initialization -->
   <script src="/static/js/ui/voice-initializer.js"></script>
