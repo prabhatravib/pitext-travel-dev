@@ -124,10 +124,18 @@ class FunctionHandler:
                 "success": False,
                 "error": "Missing required parameters: city and days"
             }
-        
         try:
             # Generate itinerary using existing logic
-            itinerary = generate_trip_itinerary(city, days)
+            itinerary_data = generate_trip_itinerary(city, days)
+            
+            # Wrap the list in a proper dictionary structure
+            itinerary = {
+                'days': itinerary_data,
+                'metadata': {
+                    'city': city,
+                    'days': days
+                }
+            }
             
             # Store in session-like structure (need to handle this properly)
             # For now, we'll return the data and let the WebSocket handler manage session
@@ -140,18 +148,16 @@ class FunctionHandler:
             voice_response = (
                 f"Your {days}-day adventure in {city} is ready!  "
                 + " ".join(bullet_lines)
-                + "  Say a day number if you’d like more detail."
+                + "  Say a day number if you'd like more detail."
             )
-            
+
             return {
                 "success": True,
-                "itinerary": itinerary,
+                "itinerary": itinerary,  # Now properly structured
                 "city": city,
                 "days": days,
                 "voice_response": voice_response,
-                "action": "render_map"  # Tell frontend to render the map
-            }
-            
+                "action": "render_map"}
         except Exception as e:
             logger.error(f"Failed to generate itinerary: {e}")
             return {
