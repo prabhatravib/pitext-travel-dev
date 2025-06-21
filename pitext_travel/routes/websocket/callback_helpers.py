@@ -59,9 +59,6 @@ def wire_realtime_callbacks(socketio, realtime_session, sid: str, namespace: str
                     call_id, name, args
                 )
                 
-                # Send function result back to OpenAI
-                realtime_session.client.send_function_result(call_id, result)
-                
                 # Enhanced handling for plan_trip
                 if name == "plan_trip" and result.get("success"):
                     logger.info("✅ Trip planned successfully via voice")
@@ -104,18 +101,17 @@ def wire_realtime_callbacks(socketio, realtime_session, sid: str, namespace: str
                         result['voice_response'] = voice_response
                         result['success'] = True
                         
-                        # Send updated result to OpenAI
-                        realtime_session.client.send_function_result(call_id, result)
-                        
                         logger.info(f"📝 Explained day {result.get('day_number')} via voice")
                     else:
                         logger.warning("No current itinerary found for explain_day")
-                        error_result = {
+                        result = {
                             "success": False,
                             "error": "No current itinerary available",
                             "voice_response": "I don't have a current itinerary to explain. Would you like me to plan a trip first?"
                         }
-                        realtime_session.client.send_function_result(call_id, error_result)
+
+                # Send final result back to OpenAI
+                realtime_session.client.send_function_result(call_id, result)
                         
             else:
                 logger.error(f"❌ No function handler available for session {realtime_session.session_id}")

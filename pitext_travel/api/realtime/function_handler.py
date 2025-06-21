@@ -129,38 +129,22 @@ class FunctionHandler:
             itinerary_data = generate_trip_itinerary(city, days)
             
             # Wrap the list in a proper dictionary structure
-            itinerary = itinerary_data  # Use the data as-is
-            if not isinstance(itinerary, dict):
-                itinerary = {'days': itinerary_data}
-            itinerary['metadata'] = {
-                'city': city,
-                'days': days
+            itinerary = {
+                'days': itinerary_data,
+                'metadata': {
+                    'city': city,
+                    'days': days
+                }
             }
-
-
-
             
-            # Store in session-like structure (need to handle this properly)
-            # For now, we'll return the data and let the WebSocket handler manage session
-            
-            # Format response for voice
-            bullet_lines = []
-            for i, day in enumerate(itinerary['days'], 1):
-                stops = ', '.join([s['name'] for s in day['stops']])
-                bullet_lines.append(f"Day {i}: {stops}.")
-            voice_response = (
-                f"Your {days}-day adventure in {city} is ready!  "
-                + " ".join(bullet_lines)
-                + "  Say a day number if you'd like more detail."
-            )
-
+            # The voice response is now handled by the frontend to avoid duplication
             return {
                 "success": True,
-                "itinerary": itinerary,  # Now properly structured
+                "itinerary": itinerary,
                 "city": city,
                 "days": days,
-                "voice_response": voice_response,
-                "action": "render_map"}
+                "action": "render_map"
+            }
         except Exception as e:
             logger.error(f"Failed to generate itinerary: {e}")
             return {

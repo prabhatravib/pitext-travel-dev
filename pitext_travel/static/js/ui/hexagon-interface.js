@@ -339,6 +339,11 @@ class HexagonInterface {
         if (window.TravelApp && window.TravelApp.processItinerary) {
             await window.TravelApp.processItinerary(city, days);
         }
+
+        // Show a confirmation message in the chat
+        if (window.chatInstance) {
+            window.chatInstance.addBubble('assistant', `I've created your ${days}-day itinerary for ${city}! You can see it on the map.`);
+        }
     }
 }
 
