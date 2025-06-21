@@ -1,43 +1,53 @@
-import concurrent.futures
-from flask import current_app
-import googlemaps
+"""Google Maps geocoding helpers.
+
+This module intentionally avoids importing *generate_trip_itinerary* or
+anything else from llm.py at run‑time to prevent circular imports.
+"""
+
+from __future__ import annotations
+
+import logging
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pitext_travel.api.llm import Stop          # only for the type checker
-# Corrected import path
+import googlemaps
 
-def enhance_itinerary_with_geocoding(itinerary: dict, gmaps: googlemaps.Client) -> dict:
-    """
-    Enhances the itinerary by geocoding each stop to get coordinates and other details in parallel.
-    """
-    
-    def geocode_stop(stop):
-        try:
-            geocode_result = gmaps.geocode(stop.name)
-            if geocode_result:
-                location = geocode_result[0]['geometry']['location']
-                stop.lat = location['lat']
-                stop.lng = location['lng']
-                stop.place_id = geocode_result[0]['place_id']
-                stop.types = geocode_result[0]['types']
-                current_app.logger.info(f"Found details for {stop.name}: {stop.lat}, {stop.lng}, Types: {stop.types}")
-                return stop
-        except Exception as e:
-            current_app.logger.error(f"Error geocoding {stop.name}: {e}")
-        return None
+from pitext_travel.api.config import get_google_maps_api_key
 
-    # Use a ThreadPoolExecutor to perform geocoding requests concurrently
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        all_stops = [stop for day in itinerary.days for stop in day.stops]
-        
-        # This will submit all geocoding tasks at once and they will run in parallel
-        future_to_stop = {executor.submit(geocode_stop, stop): stop for stop in all_stops}
-        
-        for future in concurrent.futures.as_completed(future_to_stop):
-            # As each future completes, the result is processed
-            # The original stop object in the itinerary is updated
-            future.result()
+if TYPE_CHECKING:  # Imported only for static type‑checking
+    from pitext_travel.api.models import Stop, Itinerary
 
-    current_app.logger.info("Finished enhancing itinerary with geocoding.")
+logger = logging.getLogger(__name__)
+
+
+def _lookup_location(gmaps: googlemaps.Client, query: str) -> tuple[float, float] | None:
+    """Return (lat, lng) for the given address or place name, if found."""
+    try:
+        result = gmaps.geocode(query, language="en", region="us", limit=1)
+        if result:
+            loc = result[0]["geometry"]["location"]
+            return float(loc["lat"]), float(loc["lng"])
+    except Exception as exc:  # broad except because Google client raises many
+        logger.warning("Geocode lookup failed for %s: %s", query, exc)
+    return None
+
+
+def enhance_itinerary_with_geocoding(itinerary: list[dict]) -> list[dict]:
+    """Populate each stop with latitude/longitude (in‑place) and return the itinerary."""
+    api_key = get_google_maps_api_key()
+    if not api_key:
+        logger.warning("GOOGLE_MAPS_KEY not configured; skipping geocoding.")
+        return itinerary
+
+    gmaps = googlemaps.Client(key=api_key, timeout=5)
+
+    for day in itinerary:
+        for stop in day.get("stops", []):
+            # Only geocode if the coordinates are missing
+            if stop.get("lat") is None or stop.get("lng") is None:
+                coords = _lookup_location(gmaps, stop["name"])
+                if coords:
+                    stop["lat"], stop["lng"] = coords
+                else:
+                    logger.debug("No coordinates found for %s", stop["name"])
+
     return itinerary
