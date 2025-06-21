@@ -38,7 +38,7 @@ class WebSocketConnection {
                 // Connect to WebSocket namespace
                 this.socket = io(this.namespace, {
                     transports: ['websocket', 'polling'],
-                    path: '/socket.io/', 
+                    path: '/socket.io', 
                     reconnection: true,
                     reconnectionAttempts: this.maxReconnectAttempts,
                     reconnectionDelay: 1000,

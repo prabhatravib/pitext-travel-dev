@@ -69,8 +69,8 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="eventlet",
     logger=True,
-    engineio_logger=False  
-    #path="travel/socket.io",
+    engineio_logger=False,
+    path="socket.io"
 )
 logger.info("Socket.IO initialised (async_mode=eventlet)")
 
