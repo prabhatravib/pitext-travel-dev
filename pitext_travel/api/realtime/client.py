@@ -141,7 +141,7 @@ class RealtimeClient:
         # Create session with server-side VAD
         self.update_session(
             input_audio_format="pcm16",
-            output_audio_format="pcm_24000",
+            output_audio_format="pcm16",
             instructions=self.config["instructions"],
             temperature=self.config["temperature"],
             turn_detection={
