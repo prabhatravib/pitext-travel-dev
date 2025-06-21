@@ -82,7 +82,7 @@ function renderDayControls(days) {
     checkbox.style.height = "18px";
 
     // When toggled, this will show/hide markers & routes for this day
-    checkbox.onchange = () => toggleDay(i);
+    checkbox.onchange = () => toggleDay(i, days.length);
 
     // 3) Assemble & append
     wrapper.appendChild(label);
@@ -98,22 +98,33 @@ function renderDayControls(days) {
  *
  * @param {number} dayIndex
  *   Zero-based index (0 → Day 1, 1 → Day 2, etc.)
+ * @param {number} totalDays
+ *  The total number of days in the trip
  */
-function toggleDay(dayIndex) {
+function toggleDay(dayIndex, totalDays) {
   const { debugLog } = window.TravelHelpers;
   const { toggleMarkersForDay } = window.TravelMarkers;
   const { toggleRoutesForDay } = window.TravelRoutes;
 
-  debugLog(`Toggling day ${dayIndex + 1}`);
+  debugLog(
+    `Toggling day ${dayIndex + 1} of ${totalDays}. New state: ${!dayVisibility[dayIndex]}`
+  );
 
+  // Update visibility state for the clicked day
   dayVisibility[dayIndex] = !dayVisibility[dayIndex];
   
   // Save state globally
   window.currentDayVisibility = dayVisibility;
 
-  // Update markers and routes visibility
+  // Update UI
   toggleMarkersForDay(dayIndex, dayVisibility[dayIndex]);
   toggleRoutesForDay(dayIndex, dayVisibility[dayIndex]);
+
+  // Also update the checkbox state visually
+  const checkbox = document.getElementById(`day-checkbox-${dayIndex}`);
+  if (checkbox) {
+    checkbox.checked = dayVisibility[dayIndex];
+  }
 }
 
 /**
