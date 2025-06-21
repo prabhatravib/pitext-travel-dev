@@ -219,6 +219,12 @@ class VoiceUI {
             console.log('🎤 Voice triggered itinerary render:', data);
             
             if (window.TravelApp && data.itinerary) {
+                // Debug map readiness
+                console.log('🗺️ Map modules ready:', window.mapModulesReady);
+                console.log('🗺️ TravelApp available:', !!window.TravelApp);
+                console.log('🗺️ TravelApp.renderTripOnMap available:', !!window.TravelApp.renderTripOnMap);
+                console.log('🗺️ Itinerary data structure:', data.itinerary);
+                
                 // Ensure map is ready
                 if (window.mapModulesReady) {
                     console.log('🗺️ Map ready, rendering itinerary immediately');
@@ -236,6 +242,12 @@ class VoiceUI {
                         `🗺️ I've created your ${days}-day itinerary for ${city}! You can see it on the map.`
                     );
                 }
+            } else {
+                console.error('❌ Missing TravelApp or itinerary data:', {
+                    hasTravelApp: !!window.TravelApp,
+                    hasItinerary: !!data.itinerary,
+                    data: data
+                });
             }
         });
         

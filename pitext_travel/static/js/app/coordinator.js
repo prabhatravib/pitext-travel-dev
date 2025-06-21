@@ -12,7 +12,10 @@ const TravelCoordinator = {
         const { isMapLoaded } = window.TravelGoogleMaps;
         const { fetchItinerary } = window.TravelAPI;
 
+        debugLog("🚀 processItinerary called with:", { city, days });
+
         if (!isMapLoaded()) {
+            debugLog("❌ Map not loaded yet");
             return showError("Google Maps is still loading. Please wait a moment and try again.");
         }
 
@@ -21,10 +24,14 @@ const TravelCoordinator = {
             return;
         }
 
+        debugLog("✅ Starting HTTP-based itinerary generation");
         showLoading("Generating your trip itinerary!");
         
         try {
+            debugLog("📡 Fetching itinerary from API...");
             const data = await fetchItinerary(city, days);
+            debugLog("📡 Received itinerary data:", data);
+            
             window.tripData = data;
             this.renderTripOnMap(data);
             hideOverlay();
@@ -43,6 +50,8 @@ const TravelCoordinator = {
         const { showError } = window.TravelOverlays;
         const { fitMapToBounds } = window.TravelGoogleMaps;
 
+        debugLog("🗺️ renderTripOnMap called with data:", data);
+
         if (!data || !data.days || data.days.length === 0) {
             errorLog("Invalid itinerary data:", data);
             showError("No itinerary data to display");
@@ -59,6 +68,9 @@ const TravelCoordinator = {
         // Check if required modules exist
         if (!window.TravelMarkers || !window.TravelRoutes || !window.TravelControls) {
             errorLog("Required map modules not loaded");
+            debugLog("TravelMarkers:", !!window.TravelMarkers);
+            debugLog("TravelRoutes:", !!window.TravelRoutes);
+            debugLog("TravelControls:", !!window.TravelControls);
             showError("Map modules not loaded properly");
             return;
         }
