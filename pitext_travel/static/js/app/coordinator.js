@@ -66,32 +66,27 @@ const TravelCoordinator = {
         debugLog("🗺️ Rendering trip on map with", data.days.length, "days");
 
         try {
-            // Clear existing elements
+            // Clear existing elements first
             window.TravelMarkers.clearAllMarkers();
             window.TravelRoutes.clearAllRoutes();
             window.TravelControls.clearDayControls();
 
-            // Create markers and get bounds
+            // IMPORTANT: Render controls first to initialize visibility state.
+            // This ensures that when markers/routes are created, they know
+            // whether they should be visible from the start.
+            window.TravelControls.renderDayControls(data.days);
+
+            // Create markers and get map bounds. The visibility is handled
+            // inside createMarker using the now-initialized control state.
             const { bounds, totalStops } = window.TravelMarkers.createAllMarkers(data);
             debugLog("Created markers for", totalStops, "total stops");
 
-            // Create routes
+            // Create routes for all days. Visibility is handled inside.
             window.TravelRoutes.createAllRoutes(data);
             debugLog("Created routes for all days");
 
-            // Hide all days except the first one initially
-            data.days.forEach((_, idx) => {
-                if (idx > 0) {
-                    window.TravelMarkers.toggleMarkersForDay(idx, false);
-                    window.TravelRoutes.toggleRoutesForDay(idx, false);
-                }
-            });
-
-            // Fit map to bounds
+            // Fit map to the bounds of all created markers
             fitMapToBounds(bounds, totalStops);
-
-            // Render day controls
-            window.TravelControls.renderDayControls(data.days);
 
             debugLog("✅ Trip rendering complete!");
             
