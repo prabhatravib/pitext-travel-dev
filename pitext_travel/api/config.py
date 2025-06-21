@@ -34,11 +34,10 @@ def get_render_mode():
     return os.getenv("RENDER_MODE", "html")
 
 turn_cfg = TurnDetection(
-    # Option A – keep server VAD but shrink the timeout
     type="server_vad",
-    threshold=0.45,           # a bit more sensitive
-    prefix_padding_ms=250,
-    silence_duration_ms=150,  # was 500
+    threshold=0.5,  # More standard threshold
+    prefix_padding_ms=300,
+    silence_duration_ms=1000,  # 1 second of silence (was 150ms)
     create_response=True,
     interrupt_response=True,
 )
