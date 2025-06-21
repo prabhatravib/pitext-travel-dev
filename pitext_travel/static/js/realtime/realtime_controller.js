@@ -124,6 +124,7 @@ class RealtimeController {
         
         this.stateMachine.on('onEnterProcessing', () => {
             // OpenAI detected end of speech and is processing
+            this.wsClient.commitAudio();
         });
         
         this.stateMachine.on('onEnterSpeaking', () => {

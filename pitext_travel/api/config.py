@@ -35,9 +35,9 @@ def get_render_mode():
 
 turn_cfg = TurnDetection(
     type="server_vad",
-    threshold=0.5,  # More standard threshold
+    threshold=0.5,  # Standard threshold (reverted from 0.3)
     prefix_padding_ms=300,
-    silence_duration_ms=1000,  # 1 second of silence (was 150ms)
+    silence_duration_ms=5000,  # 5 seconds of silence (conservative)
     create_response=True,
     interrupt_response=True,
 )
@@ -54,10 +54,10 @@ def get_realtime_config():
         # Response configuration
         "max_response_duration_ms": int(os.getenv("REALTIME_MAX_RESPONSE_DURATION_MS", "30000")),
         
-        # Voice Activity Detection (VAD) configuration
-        "vad_threshold": float(os.getenv("REALTIME_VAD_THRESHOLD", "0.5")),
+        # Voice Activity Detection (VAD) configuration - Conservative settings
+        "vad_threshold": float(os.getenv("REALTIME_VAD_THRESHOLD", "0.5")),  # Standard threshold
         "vad_prefix_ms": int(os.getenv("REALTIME_VAD_PREFIX_MS", "300")),
-        "vad_silence_ms": int(os.getenv("REALTIME_VAD_SILENCE_MS", "500")),
+        "vad_silence_ms": int(os.getenv("REALTIME_VAD_SILENCE_MS", "5000")),  # 5 seconds of silence
         
         # Session configuration
         "session_timeout_seconds": int(os.getenv("REALTIME_SESSION_TIMEOUT_SECONDS", "600")),
