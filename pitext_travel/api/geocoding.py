@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 from typing import List, Dict, Any
+import time
+from functools import lru_cache
 
 # ─── existing imports ───────────────────────────────────────────────────────────
 import googlemaps
@@ -12,7 +14,7 @@ from pitext_travel.api.config import get_google_maps_config
 logger = logging.getLogger(__name__)
 
 _gmaps: googlemaps.Client | None = None
-
+_geocoding_cache: Dict[str, tuple[float, float]] = {}
 
 def _get_client() -> googlemaps.Client:
     """Return a cached googlemaps.Client instance."""
@@ -31,15 +33,19 @@ def _get_client() -> googlemaps.Client:
             return None
     return _gmaps
 
+@lru_cache(maxsize=1000)
 def get_coordinates_for_place(place: str) -> tuple[float, float] | None:
-    """Resolve a free-text place name to (lat, lng) or None if not found."""
+    """Resolve a free-text place name to (lat, lng) or None if not found.
+    
+    Now uses LRU cache for better performance.
+    """
     try:
         client = _get_client()
         if client is None:
             logger.error("No Google Maps client available")
             return None
             
-        logger.info(f"Geocoding place: {place}")
+        logger.debug(f"Geocoding place: {place}")
         results = client.geocode(place, language="en")
         
         if not results:
@@ -47,11 +53,45 @@ def get_coordinates_for_place(place: str) -> tuple[float, float] | None:
             return None
             
         loc = results[0]["geometry"]["location"]
-        logger.info(f"Geocoded {place} to {loc['lat']}, {loc['lng']}")
+        logger.debug(f"Geocoded {place} to {loc['lat']}, {loc['lng']}")
         return loc["lat"], loc["lng"]
     except Exception as e:
         logger.error(f"Geocoding error for '{place}': {e}")
         return None
+
+def batch_geocode_places(places: List[str], city: str = "") -> Dict[str, tuple[float, float]]:
+    """Geocode multiple places efficiently with caching and batching.
+    
+    Args:
+        places: List of place names to geocode
+        city: Optional city context for better results
+        
+    Returns:
+        Dictionary mapping place names to (lat, lng) coordinates
+    """
+    results = {}
+    start_time = time.time()
+    
+    for place in places:
+        # Check cache first
+        if place in _geocoding_cache:
+            results[place] = _geocoding_cache[place]
+            continue
+            
+        # Add city context for better results
+        query = f"{place}, {city}" if city else place
+        
+        coords = get_coordinates_for_place(query)
+        if coords:
+            results[place] = coords
+            _geocoding_cache[place] = coords  # Cache the result
+        else:
+            logger.warning(f"Failed to geocode '{place}'")
+    
+    duration = time.time() - start_time
+    logger.info(f"Batch geocoded {len(places)} places in {duration:.2f}s")
+    
+    return results
 
 # ────────────────────────────────────────────────────────────────────────────────
 # NEW: itinerary post-processor
@@ -70,7 +110,11 @@ def enhance_itinerary_with_geocoding(itinerary: List[Dict[str, Any]]) -> List[Di
 
     Returns the **same list object** for convenience.
     """
-    for day in itinerary:
+    # Collect all place names for batch geocoding
+    all_places = []
+    place_to_stop_map = {}
+    
+    for day_idx, day in enumerate(itinerary):
         # Each day can be a dict or a dataclass – handle both.
         stops = None
         if isinstance(day, dict):
@@ -81,7 +125,7 @@ def enhance_itinerary_with_geocoding(itinerary: List[Dict[str, Any]]) -> List[Di
         if not stops:
             continue
 
-        for stop in stops:
+        for stop_idx, stop in enumerate(stops):
             # Stop can be dict or object; normalise to dict-like API.
             name = stop["name"] if isinstance(stop, dict) else getattr(stop, "name", "")
             if not name:
@@ -102,12 +146,20 @@ def enhance_itinerary_with_geocoding(itinerary: List[Dict[str, Any]]) -> List[Di
                 logger.debug(f"Skipping geocoding for '{name}' - already has valid coordinates")
                 continue
 
-            coords = get_coordinates_for_place(name)
-            if coords is None:
-                logger.warning("Geocoding failed for '%s'", name)
-                continue
-
+            # Add to batch geocoding list
+            all_places.append(name)
+            place_to_stop_map[name] = (day_idx, stop_idx, stop)
+    
+    # Batch geocode all places
+    if all_places:
+        logger.info(f"Batch geocoding {len(all_places)} places...")
+        geocoded_results = batch_geocode_places(all_places)
+        
+        # Apply results back to stops
+        for place_name, coords in geocoded_results.items():
+            day_idx, stop_idx, stop = place_to_stop_map[place_name]
             lat, lng = coords
+            
             if isinstance(stop, dict):
                 stop["lat"] = lat
                 stop["lng"] = lng
@@ -116,8 +168,10 @@ def enhance_itinerary_with_geocoding(itinerary: List[Dict[str, Any]]) -> List[Di
                 setattr(stop, "lng", lng)
 
     return itinerary
+
 # Re-export for clean imports elsewhere
 __all__ = [
     "get_coordinates_for_place",
     "enhance_itinerary_with_geocoding",
+    "batch_geocode_places",
 ]

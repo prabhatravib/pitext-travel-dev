@@ -33,19 +33,10 @@ def get_render_mode():
     """Get render mode configuration."""
     return os.getenv("RENDER_MODE", "html")
 
-turn_cfg = TurnDetection(
-    type="server_vad",
-    threshold=0.5,  # Standard threshold (reverted from 0.3)
-    prefix_padding_ms=300,
-    silence_duration_ms=5000,  # 5 seconds of silence (conservative)
-    create_response=True,
-    interrupt_response=True,
-)
-
 # NEW: Realtime API Configuration
 def get_realtime_config():
     """Get OpenAI Realtime API configuration."""
-    vad_silence_ms = int(os.getenv("REALTIME_VAD_SILENCE_MS", 2000))
+    vad_silence_ms = int(os.getenv("REALTIME_VAD_SILENCE_MS", 1500))  # Reduced to 1.5 seconds
     vad_threshold = float(os.getenv("REALTIME_VAD_THRESHOLD", 0.5))
     
     # --- BEGIN DEBUG LOGGING ---
@@ -83,9 +74,7 @@ def get_realtime_config():
         "session_timeout_seconds": int(os.getenv("REALTIME_SESSION_TIMEOUT_SECONDS", "600")),
         "max_concurrent_sessions": int(os.getenv("MAX_CONCURRENT_REALTIME_SESSIONS", "50")),
         "rate_limit_per_ip": int(os.getenv("REALTIME_RATE_LIMIT_PER_IP", "10")),
-        "turn_detection":turn_cfg,
-
-
+        "turn_detection": turn_cfg,  # Fixed: use local turn_cfg, not global
         
         # Audio configuration
         "audio_format": {
@@ -95,7 +84,7 @@ def get_realtime_config():
         },
         
         # Instructions for the assistant
-    "instructions": """You are a friendly travel planning assistant helping users plan their trips through natural voice conversation.
+        "instructions": """You are a friendly travel planning assistant helping users plan their trips through natural voice conversation.
 
     IMPORTANT: Always respond verbally to user speech. When you hear the user speaking, you should:
     1. Listen carefully to what they're saying
@@ -113,7 +102,8 @@ def get_realtime_config():
     - User: "I want to visit Rome" → Ask them how many days they'll be there
     - User: "Tell me about day 2" → Use explain_day function then speak the details
 
-    Remember: This is a voice conversation, so always speak your responses!"""    }
+    Remember: This is a voice conversation, so always speak your responses!"""
+    }
 
 
 def get_websocket_config():

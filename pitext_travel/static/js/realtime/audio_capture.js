@@ -9,7 +9,7 @@ const TARGET_CHANNELS    = 1;
 
 // Audio filtering to reduce feedback
 const SILENCE_THRESHOLD = 0.005;  // Minimum energy to consider as speech
-const MIN_AUDIO_LENGTH = 512;   // Minimum samples before sending
+const MIN_AUDIO_LENGTH = 256;   // Reduced from 512 for faster response
 
 function downsampleTo24kHz(float32, inRate) {
   if (inRate === TARGET_SAMPLE_RATE) return float32;
@@ -39,7 +39,7 @@ class AudioCapture {
     this.audioBuffer   = [];
     this.bufferSize    = 0;
     this.lastSentTime  = 0;
-    this.sendInterval  = 25; // Send audio every 100ms maximum
+    this.sendInterval  = 50; // Increased from 25ms to 50ms for stability
 
     this.onAudioData   = null;
 
