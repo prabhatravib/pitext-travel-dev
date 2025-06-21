@@ -2,22 +2,25 @@
 // Socket.IO loader with CDN fallback
 
 (function loadSocketIO () {
-  function trySrc (src, done) {
-    const s = document.createElement('script');
-    s.src = src; s.async = true;
-    s.onload  = () => done(typeof io !== 'undefined');
-    s.onerror = () => done(false);
-    document.head.appendChild(s);
-  }
-  trySrc('/socket.io/socket.io.js', ok => {
-    if (ok) return console.log('[IO] loaded locally');
-    console.warn('[IO] local failed – trying CDN');
-    trySrc('https://cdn.socket.io/4.7.4/socket.io.min.js', ok2 => {
-      if (!ok2) {
-        console.error('[IO] failed everywhere – voice disabled');
-        const voiceBtn = document.getElementById('voice-button');
-        if (voiceBtn) voiceBtn.style.display = 'none';
-      } else console.log('[IO] loaded from CDN');
-    });
-  });
+  const CDN_SRC = 'https://cdn.socket.io/4.7.4/socket.io.min.js';
+
+  const script = document.createElement('script');
+  script.src = CDN_SRC;
+  script.async = true;
+
+  script.onload = () => {
+    if (typeof io !== 'undefined') {
+      console.log('[IO] Socket.IO client loaded from CDN');
+    } else {
+      console.error('[IO] Socket.IO client failed to initialise');
+    }
+  };
+
+  script.onerror = () => {
+    console.error('[IO] Failed to load Socket.IO client from CDN – voice features disabled');
+    const voiceBtn = document.getElementById('voice-button');
+    if (voiceBtn) voiceBtn.classList.add('disabled');
+  };
+
+  document.head.appendChild(script);
 })();
