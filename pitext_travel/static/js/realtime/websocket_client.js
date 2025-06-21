@@ -3,13 +3,20 @@
 
 class WebSocketClient {
     constructor() {
+        // Singleton pattern - prevent multiple instances
+        if (WebSocketClient.instance) {
+            return WebSocketClient.instance;
+        }
+        WebSocketClient.instance = this;
+        
         this.connection = new window.WebSocketConnection('/travel/ws');
         this.sessionId = null;
         
         // Event handlers
         this.eventHandlers = {};
+        this.eventsSetup = false;
         
-        console.log('WebSocketClient initialized');
+        console.log('WebSocketClient instance created (singleton)');
     }
     
     connect() {
@@ -44,9 +51,16 @@ class WebSocketClient {
     }
     
     _setupEventHandlers() {
+        // Prevent duplicate setup
+        if (this.eventsSetup) {
+            console.log('Event handlers already setup, skipping...');
+            return;
+        }
+        
         // Delegate to separate event setup module
         if (window.WebSocketEventSetup) {
             window.WebSocketEventSetup.setupEvents(this.connection, this);
+            this.eventsSetup = true;
         } else {
             console.error('WebSocketEventSetup module not loaded');
         }

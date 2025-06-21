@@ -32,28 +32,25 @@ class ConnectionHandler(BaseWebSocketHandler):
                     session['_id'] = client_info['flask_session_id']
                     session.modified = True
                 
-                # Create or get existing Realtime session
+                # Get or create Realtime session in a single atomic operation
                 manager = get_session_manager()
-                realtime_session = manager.get_session_by_flask_id(session['_id'])
+                realtime_session = manager.create_session(
+                    client_info['ip'], 
+                    session['_id']
+                )
                 
                 if not realtime_session:
-                    realtime_session = manager.create_session(
-                        client_info['ip'], 
-                        session['_id']
-                    )
-                    
-                    if not realtime_session:
-                        logger.error("❌ Failed to create realtime session - rate limited")
-                        self.emit_to_client('error', {
-                            'message': 'Rate limit exceeded or server at capacity'
-                        })
-                        disconnect()
-                        return
+                    logger.error("❌ Failed to create realtime session - rate limited")
+                    self.emit_to_client('error', {
+                        'message': 'Rate limit exceeded or server at capacity'
+                    })
+                    disconnect()
+                    return
                 
                 # Store session ID in SocketIO session
                 session['realtime_session_id'] = realtime_session.session_id
                 
-                logger.info(f"✅ Session created: {realtime_session.session_id}")
+                logger.info(f"✅ Session ready: {realtime_session.session_id}")
                 
                 self.emit_to_client('connected', {
                     'session_id': realtime_session.session_id,

@@ -3,18 +3,27 @@
 
 class VoiceUI {
     constructor() {
-        this.controller = null;
-        this.buttonEl = document.getElementById('voice-button');
-        this.statusText = document.querySelector('.status-text');
-        this.voiceCircle = document.querySelector('.voice-circle');
+        // Singleton pattern - prevent multiple instances
+        if (VoiceUI.instance) {
+            return VoiceUI.instance;
+        }
+        VoiceUI.instance = this;
         
+        this.buttonEl = document.getElementById('voice-button');
+        this.statusText = this.buttonEl?.querySelector('.status-text');
+        this.controller = null;
         this.isReady = false;
         this.isListening = false;
+        
+        // State tracking
+        this.initialized = false;
+        this.initializationPromise = null;
+        
         this.isAssistantSpeaking = false;
         this.initializationAttempts = 0;
         this.maxInitAttempts = 3;
         
-        console.log('VoiceUI initialized');
+        console.log('VoiceUI instance created (singleton)');
     }
     
     async initialize() {

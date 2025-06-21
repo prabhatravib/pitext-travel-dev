@@ -1,16 +1,30 @@
 // static/js/realtime/websocket_connection.js - WebSocket Connection Management
 // Extracted from websocket_client.js to handle connection logic
 
+// Global connection tracking to prevent duplicates
+window.WebSocketConnections = window.WebSocketConnections || {};
+window.WebSocketConnectionStates = window.WebSocketConnectionStates || {};
+
 class WebSocketConnection {
     constructor(namespace = '/travel/ws') {
+        // Check if connection already exists for this namespace
+        if (window.WebSocketConnections[namespace]) {
+            console.log(`Reusing existing connection for ${namespace}`);
+            return window.WebSocketConnections[namespace];
+        }
+        
         this.socket = null;
         this.connected = false;
         this.namespace = namespace;
+        this.connecting = false; // Track connection state
         
         // Connection settings
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.connectionTimeout = 10000; // 10 seconds
+        
+        // Store this instance globally
+        window.WebSocketConnections[namespace] = this;
         
         console.log('WebSocketConnection initialized');
     }
@@ -21,6 +35,30 @@ class WebSocketConnection {
      */
     connect() {
         return new Promise((resolve, reject) => {
+            // Check if already connected
+            if (this.connected && this.socket && this.socket.connected) {
+                console.log('WebSocket already connected, reusing existing connection');
+                resolve();
+                return;
+            }
+            
+            // Check if already connecting
+            if (this.connecting) {
+                console.log('WebSocket already connecting, waiting...');
+                // Wait for existing connection attempt
+                const checkConnection = () => {
+                    if (this.connected) {
+                        resolve();
+                    } else if (!this.connecting) {
+                        reject(new Error('Connection attempt failed'));
+                    } else {
+                        setTimeout(checkConnection, 100);
+                    }
+                };
+                checkConnection();
+                return;
+            }
+            
             // Check if Socket.IO is available
             if (!window.io) {
                 reject(new Error('Socket.IO client library not loaded'));
@@ -29,9 +67,11 @@ class WebSocketConnection {
 
             try {
                 console.log(`Attempting to connect to ${this.namespace}...`);
+                this.connecting = true;
                 
                 // Create connection with timeout
                 const timeoutId = setTimeout(() => {
+                    this.connecting = false;
                     reject(new Error('Connection timeout'));
                 }, this.connectionTimeout);
 
@@ -44,13 +84,14 @@ class WebSocketConnection {
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
                     timeout: 20000,
-                    forceNew: true
+                    forceNew: false  // Changed from true to false to prevent duplicate connections
                 });
                 
                 // Handle connection success
                 this.socket.on('connect', () => {
                     clearTimeout(timeoutId);
                     this.connected = true;
+                    this.connecting = false;
                     this.reconnectAttempts = 0;
                     console.log('WebSocket connected successfully');
                     resolve();
@@ -61,6 +102,7 @@ class WebSocketConnection {
                     clearTimeout(timeoutId);
                     console.error('WebSocket connection error:', error);
                     this.connected = false;
+                    this.connecting = false;
                     
                     this.reconnectAttempts++;
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -69,6 +111,7 @@ class WebSocketConnection {
                 });
                 
             } catch (error) {
+                this.connecting = false;
                 console.error('Failed to create WebSocket connection:', error);
                 reject(error);
             }

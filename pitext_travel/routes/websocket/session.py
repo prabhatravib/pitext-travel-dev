@@ -37,6 +37,28 @@ class SessionHandler(BaseWebSocketHandler):
                     self.emit_to_client("error", {"message": "Session not found"})
                     return
 
+                # Check if session is already active
+                if realtime_session.is_active:
+                    logger.info(f"🔄 Session {session_id} already active, skipping activation")
+                    self.emit_to_client(
+                        "session_started",
+                        {
+                            "session_id": session_id,
+                            "status": "already_active",
+                            "functions_registered": 2,  # Default function count
+                            "timestamp": time.time()
+                        },
+                    )
+                    return
+
+                # Check if there's already an active session for this Flask session
+                flask_session_id = session.get("_id", "anonymous")
+                existing_active = manager.get_active_session_by_flask_id(flask_session_id)
+                if existing_active and existing_active.session_id != session_id:
+                    logger.warning(f"⚠️ Another active session {existing_active.session_id} exists for Flask session {flask_session_id}")
+                    # Deactivate the other session first
+                    manager.deactivate_session(existing_active.session_id, "replaced_by_new_session")
+
                 # Activate (ie, open WS to the OpenAI Realtime API)
                 logger.info(f"🚀 Activating session {session_id}...")
                 if not manager.activate_session(session_id):
@@ -47,7 +69,6 @@ class SessionHandler(BaseWebSocketHandler):
                 logger.info(f"✅ Session {session_id} activated successfully")
 
                 # Create and attach function handler
-                flask_session_id = session.get("_id", "anonymous")
                 function_handler = create_function_handler(flask_session_id)
                 realtime_session.function_handler = function_handler
                 
@@ -63,7 +84,7 @@ class SessionHandler(BaseWebSocketHandler):
                 )
 
                 # Bridge callbacks → browser
-                wire_realtime_callbacks(self.socketio, realtime_session, request.sid, NAMESPACE)
+                wire_realtime_callbacks(self.socketio, realtime_session, request.sid, NAMESPACE)  # type: ignore
 
                 self.emit_to_client(
                     "session_started",
@@ -93,6 +114,11 @@ class SessionHandler(BaseWebSocketHandler):
                 rt_session = manager.get_session(session_id)
                 
                 if rt_session and rt_session.client:
+                    # Check if welcome message already sent
+                    if hasattr(rt_session, 'welcome_sent') and rt_session.welcome_sent:
+                        logger.info(f"📍 Map ready, welcome already sent for session {session_id}")
+                        return
+                    
                     # Check if we have a current itinerary to announce
                     flask_session = session
                     if 'current_itinerary' in flask_session:
@@ -103,6 +129,7 @@ class SessionHandler(BaseWebSocketHandler):
                         welcome_message = "Hi! I'm ready to help you plan your trip. Just tell me which city you'd like to visit and for how many days."
                     
                     rt_session.client.send_text(welcome_message)
+                    rt_session.welcome_sent = True  # Mark as sent
                     logger.info(f"📍 Map ready, sent welcome message for session {session_id}")
                     
             except Exception as exc:

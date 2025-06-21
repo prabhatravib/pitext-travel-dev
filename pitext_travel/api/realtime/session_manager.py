@@ -32,6 +32,8 @@ class RealtimeSession:
         # Components
         self.client = RealtimeClient(session_id)
         self.audio_handler = AudioHandler()
+        self.function_handler: Optional[Any] = None  # Will be set when session is activated
+        self.welcome_sent: bool = False  # Track if welcome message has been sent
         
         # State
         self.is_active = False
@@ -76,6 +78,12 @@ class SessionManager:
             RealtimeSession object or None if rate limited
         """
         with self.lock:
+            # Check if there's already a session for this Flask session (active or not)
+            existing_session = self.get_session_by_flask_id(flask_session_id)
+            if existing_session:
+                logger.info(f"Reusing existing session {existing_session.session_id} for Flask session {flask_session_id}")
+                return existing_session
+            
             # Check rate limit
             if self.ip_session_count[user_ip] >= self.config["rate_limit_per_ip"]:
                 logger.warning(f"Rate limit exceeded for IP {user_ip}")
@@ -121,6 +129,27 @@ class SessionManager:
             
         Returns:
             Most recent RealtimeSession for this Flask session or None
+        """
+        with self.lock:
+            matching_sessions = [
+                s for s in self.sessions.values()
+                if s.flask_session_id == flask_session_id
+            ]
+            
+            if matching_sessions:
+                # Return most recent session (active or not)
+                return max(matching_sessions, key=lambda s: s.created_at)
+            
+            return None
+    
+    def get_active_session_by_flask_id(self, flask_session_id: str) -> Optional[RealtimeSession]:
+        """Get an active session by Flask session ID.
+        
+        Args:
+            flask_session_id: Flask session ID
+            
+        Returns:
+            Most recent active RealtimeSession for this Flask session or None
         """
         with self.lock:
             matching_sessions = [

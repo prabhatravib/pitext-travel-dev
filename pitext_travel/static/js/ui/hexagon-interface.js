@@ -20,11 +20,25 @@ class HexagonInterface {
         // Set up event handlers
         this.setupEventHandlers();
         
-        // Initialize voice if available
+        // Initialize voice if available - use existing instance or create new one
         if (window.VoiceUI) {
             try {
-                this.voiceController = new window.VoiceUI();
-                await this.voiceController.initialize();
+                // Use existing VoiceUI instance or create new one (singleton)
+                if (!window.voiceUI) {
+                    this.voiceController = new window.VoiceUI();
+                    window.voiceUI = this.voiceController;
+                } else {
+                    this.voiceController = window.voiceUI;
+                }
+                
+                // Wait for initialization if not already done
+                if (window.VoiceInitialization && window.VoiceInitialization.promise) {
+                    await window.VoiceInitialization.promise;
+                } else if (!this.voiceController.initialized && this.voiceController.initializationPromise) {
+                    await this.voiceController.initializationPromise;
+                } else if (!this.voiceController.initialized) {
+                    await this.voiceController.initialize();
+                }
                 
                 // Override the voice button with our mic button
                 this.voiceController.buttonEl = this.micButton;

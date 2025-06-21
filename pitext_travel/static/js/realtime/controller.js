@@ -3,24 +3,40 @@
 
 class RealtimeController {
     constructor() {
-        // Core components
-        this.audioCapture = new window.AudioCapture();
-        this.audioPlayer = new window.AudioPlayer();
-        this.wsClient = new window.WebSocketClient();
-        this.stateMachine = new window.VoiceStateMachine();
+        // Singleton pattern - prevent multiple instances
+        if (RealtimeController.instance) {
+            return RealtimeController.instance;
+        }
+        RealtimeController.instance = this;
         
-        // State
-        this.isInitialized = false;
-        this.isConnected = false;
+        this.audioCapture = null;
+        this.audioPlayer = null;
+        this.stateMachine = null;
+        this.wsClient = null;
         
-        // Event handlers for external listeners
+        this.connected = false;
+        this.ready = false;
         this.eventHandlers = {};
         
-        console.log('RealtimeController initialized');
+        console.log('RealtimeController instance created (singleton)');
     }
     
     async initialize() {
         try {
+            // Create components if not already created
+            if (!this.audioCapture) {
+                this.audioCapture = new window.AudioCapture();
+            }
+            if (!this.audioPlayer) {
+                this.audioPlayer = new window.AudioPlayer();
+            }
+            if (!this.wsClient) {
+                this.wsClient = new window.WebSocketClient();
+            }
+            if (!this.stateMachine) {
+                this.stateMachine = new window.VoiceStateMachine();
+            }
+            
             // Initialize audio components
             await this.audioCapture.initialize();
             await this.audioPlayer.initialize();
@@ -28,7 +44,7 @@ class RealtimeController {
             // Set up component interactions
             this._setupComponents();
             
-            this.isInitialized = true;
+            this.ready = true;
             console.log('RealtimeController initialized successfully');
             
             return true;
@@ -41,7 +57,7 @@ class RealtimeController {
     }
     
     async connect() {
-        if (!this.isInitialized) {
+        if (!this.ready) {
             await this.initialize();
         }
         
@@ -53,7 +69,7 @@ class RealtimeController {
             this.audioCapture.start();
             this.audioCapture.setEnabled(true);  // Enable immediately
             
-            this.isConnected = true;
+            this.connected = true;
             this._trigger('connected');
             
             // Start Realtime session
@@ -79,7 +95,7 @@ class RealtimeController {
         // Reset state machine
         this.stateMachine.reset();
         
-        this.isConnected = false;
+        this.connected = false;
         this._trigger('disconnected');
     }
     
@@ -102,8 +118,8 @@ class RealtimeController {
      */
     getState() {
         return {
-            initialized: this.isInitialized,
-            connected: this.isConnected,
+            ready: this.ready,
+            connected: this.connected,
             stateMachine: this.stateMachine.getState(),
             audioCapture: this.audioCapture.isActive(),
             audioPlayer: this.audioPlayer.getPlaybackState()
