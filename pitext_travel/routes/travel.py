@@ -84,6 +84,70 @@ def create_travel_blueprint(base_dir):
                             }
             return jsonify(itinerary)
     
+    @travel_bp.route("/test-namespace")
+    def test_namespace():
+        """Test if the /travel/ws namespace is properly registered."""
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>Namespace Test</title></head>
+        <body>
+          <h1>Namespace Registration Test</h1>
+          <div id="status">Testing...</div>
+          <div id="log"></div>
+          <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+          <script>
+            const status = document.getElementById('status');
+            const log = document.getElementById('log');
+            function add(msg){ log.innerHTML += `<p>${new Date().toISOString()}: ${msg}</p>`; }
+
+            add('Testing namespace registration...');
+            
+            // Test 1: Try to connect to /travel/ws
+            add('Attempting to connect to /travel/ws...');
+            const travelSocket = io('/travel/ws', { 
+              path: '/socket.io',
+              transports: ['polling'],
+              timeout: 5000
+            });
+
+            travelSocket.on('connect', () => {
+              add('✅ SUCCESS: Connected to /travel/ws namespace');
+              status.textContent = 'Namespace is working!';
+              
+              // Test ping
+              travelSocket.emit('ping');
+            });
+            
+            travelSocket.on('pong', (data) => {
+              add(`✅ PING/PONG working: ${JSON.stringify(data)}`);
+            });
+            
+            travelSocket.on('connect_error', (e) => {
+              add(`❌ FAILED to connect to /travel/ws: ${e.message}`);
+              status.textContent = 'Namespace registration failed';
+            });
+            
+            // Test 2: Also test default namespace
+            add('Also testing default namespace...');
+            const defaultSocket = io('/', { 
+              path: '/socket.io',
+              transports: ['polling'],
+              timeout: 5000
+            });
+            
+            defaultSocket.on('connect', () => {
+              add('⚠️ Connected to default namespace (this might be the fallback)');
+            });
+            
+            defaultSocket.on('connect_error', (e) => {
+              add(`❌ Default namespace also failed: ${e.message}`);
+            });
+          </script>
+        </body>
+        </html>
+        """
+    
     @travel_bp.route("/health")
     def health():
         """Health check endpoint."""

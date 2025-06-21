@@ -130,35 +130,6 @@ def health():
     return {"status": "ok", "blueprint_loaded": blueprint_loaded}
 
 
-@app.route("/test-socketio")
-def test_socketio():
-    """Tiny page to verify Socket.IO connectivity."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head><title>Socket.IO Test</title></head>
-    <body>
-      <h1>Socket.IO Connection Test</h1>
-      <div id="status">Connecting...</div>
-      <div id="log"></div>
-      <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-      <script>
-        const status = document.getElementById('status');
-        const log    = document.getElementById('log');
-        function add(msg){ log.innerHTML += `<p>${new Date().toISOString()}: ${msg}</p>`; }
-
-        const socket = io('/travel/ws', { path: '/socket.io' });
-
-        socket.on('connect',        ()  => { status.textContent = '✅ Connected';  add('Connected'); });
-        socket.on('disconnect',     r   => { status.textContent = `❌ Disconnect: ${r}`; add(`Disconnect: ${r}`); });
-        socket.on('connect_error',  e   => { status.textContent = `❌ Error: ${e.message}`; add(`Error: ${e.message}`); });
-        socket.on('connected',      d   => { add(`Connected event: ${JSON.stringify(d)}`); });
-      </script>
-    </body>
-    </html>
-    """
-
-
 @app.route("/debug")
 def debug():
     """Basic JSON diagnostics."""
@@ -177,12 +148,12 @@ def debug():
 # ------------------------------------------------------------------------------
 @socketio.on("connect")
 def _connect():
-    logger.info("Client connected to default namespace")
+    logger.info("🔗 Client connected to default namespace (this should not happen for voice chat)")
 
 
 @socketio.on("disconnect")
 def _disconnect():
-    logger.info("Client disconnected from default namespace")
+    logger.info("🔌 Client disconnected from default namespace")
 
 # ------------------------------------------------------------------------------
 # Entrypoint

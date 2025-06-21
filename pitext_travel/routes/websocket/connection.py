@@ -3,7 +3,7 @@
 
 import time
 import logging
-from flask import session
+from flask import session, request
 from flask_socketio import disconnect
 
 from .base import BaseWebSocketHandler, NAMESPACE
@@ -22,6 +22,10 @@ class ConnectionHandler(BaseWebSocketHandler):
             """Handle WebSocket connection from browser."""
             client_info = self.get_client_info()
             self.log_event('connect', {'auth': auth})
+            
+            # Add detailed logging for debugging
+            logger.info(f"🔗 Client connected to /travel/ws namespace: {client_info['sid']}")
+            logger.info(f"📋 Flask session keys: {list(session.keys())}")
             
             try:
                 # Ensure Flask session has an ID

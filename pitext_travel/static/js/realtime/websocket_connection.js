@@ -22,7 +22,7 @@ class WebSocketConnection {
         // Connection settings - optimized for Render
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3; // Reduced for faster fallback
-        this.connectionTimeout = 15000; // Reduced to 15 seconds for faster failure detection
+        this.connectionTimeout = 10000; // Reduced from 15000 to 10000
         
         // Store this instance globally
         window.WebSocketConnections[namespace] = this;
@@ -71,65 +71,10 @@ class WebSocketConnection {
             console.log(`Attempting to connect to ${this.namespace} (attempt ${this.reconnectAttempts + 1})...`);
             this.connecting = true;
             
-            // Create connection with timeout
-            const timeoutId = setTimeout(() => {
-                this.connecting = false;
-                this.connectionPromise = null; // Clear promise on timeout
-                if (this.socket) {
-                    this.socket.disconnect();
-                }
-                console.error(`Connection timeout after ${this.connectionTimeout}ms`);
-                this._handleConnectionFailure(resolve, reject, 'timeout');
-            }, this.connectionTimeout);
-
-            // Progressive transport strategy for Render compatibility
-            const transportStrategy = this._getTransportStrategy();
-            console.log(`Using transport strategy: ${transportStrategy.transports.join(', ')}`);
-            
-            // Connect to WebSocket namespace
-            this.socket = io(this.namespace, {
-                ...transportStrategy,
-                path: '/socket.io',
-                reconnection: false, // We handle reconnection manually
-                timeout: this.connectionTimeout,
-                forceNew: true, // Force new connection to avoid cached issues
-                autoConnect: true,
-                upgrade: transportStrategy.transports.includes('polling'),
-                rememberUpgrade: false, // Don't remember upgrade to avoid issues
-                pingTimeout: 60000,
-                pingInterval: 25000
-            });
-            
-            // Handle connection success
-            this.socket.on('connect', () => {
-                clearTimeout(timeoutId);
-                this.connected = true;
-                this.connecting = false;
-                this.reconnectAttempts = 0;
-                console.log(`✅ WebSocket connected successfully using ${transportStrategy.transports.join(', ')}`);
-                resolve();
-            });
-            
-            // Handle connection failure
-            this.socket.on('connect_error', (error) => {
-                clearTimeout(timeoutId);
-                console.error('WebSocket connection error:', error);
-                this.connected = false;
-                this.connecting = false;
-                this._handleConnectionFailure(resolve, reject, error.message);
-            });
-            
-            // Handle transport errors
-            this.socket.on('error', (error) => {
-                console.error('WebSocket transport error:', error);
-            });
-            
-            // Handle disconnect
-            this.socket.on('disconnect', (reason) => {
-                console.log('WebSocket disconnected:', reason);
-                this.connected = false;
-                this.connecting = false;
-            });
+            // Small delay to ensure server is ready (especially important on Render)
+            setTimeout(() => {
+                this._performConnection(resolve, reject);
+            }, 500);
             
         } catch (error) {
             this.connecting = false;
@@ -140,26 +85,92 @@ class WebSocketConnection {
     }
     
     /**
+     * Perform the actual connection attempt
+     */
+    _performConnection(resolve, reject) {
+        // Create connection with timeout
+        const timeoutId = setTimeout(() => {
+            this.connecting = false;
+            this.connectionPromise = null; // Clear promise on timeout
+            if (this.socket) {
+                this.socket.disconnect();
+            }
+            console.error(`Connection timeout after ${this.connectionTimeout}ms`);
+            this._handleConnectionFailure(resolve, reject, 'timeout');
+        }, this.connectionTimeout);
+
+        // Progressive transport strategy for Render compatibility
+        const transportStrategy = this._getTransportStrategy();
+        console.log(`Using transport strategy: ${transportStrategy.transports.join(', ')}`);
+        
+        // Connect to WebSocket namespace
+        this.socket = io(this.namespace, {
+            ...transportStrategy,
+            path: '/socket.io',
+            reconnection: false, // We handle reconnection manually
+            timeout: this.connectionTimeout,
+            forceNew: true, // Force new connection to avoid cached issues
+            autoConnect: true,
+            upgrade: transportStrategy.transports.includes('polling'),
+            rememberUpgrade: false, // Don't remember upgrade to avoid issues
+            pingTimeout: 60000,
+            pingInterval: 25000
+        });
+        
+        // Handle connection success
+        this.socket.on('connect', () => {
+            clearTimeout(timeoutId);
+            this.connected = true;
+            this.connecting = false;
+            this.reconnectAttempts = 0;
+            console.log(`✅ WebSocket connected successfully using ${transportStrategy.transports.join(', ')}`);
+            resolve();
+        });
+        
+        // Handle connection failure
+        this.socket.on('connect_error', (error) => {
+            clearTimeout(timeoutId);
+            console.error('WebSocket connection error:', error);
+            this.connected = false;
+            this.connecting = false;
+            this._handleConnectionFailure(resolve, reject, error.message);
+        });
+        
+        // Handle transport errors
+        this.socket.on('error', (error) => {
+            console.error('WebSocket transport error:', error);
+        });
+        
+        // Handle disconnect
+        this.socket.on('disconnect', (reason) => {
+            console.log('WebSocket disconnected:', reason);
+            this.connected = false;
+            this.connecting = false;
+        });
+    }
+    
+    /**
      * Get transport strategy based on attempt number
      */
     _getTransportStrategy() {
+        // Simplified strategy - try polling first for better compatibility with Render
         if (this.reconnectAttempts === 0) {
-            // First attempt: Try WebSocket only
+            // First attempt: Try polling (most compatible)
+            return {
+                transports: ['polling'],
+                upgrade: false
+            };
+        } else if (this.reconnectAttempts === 1) {
+            // Second attempt: Try WebSocket
             return {
                 transports: ['websocket'],
                 upgrade: false
             };
-        } else if (this.reconnectAttempts === 1) {
-            // Second attempt: Try polling first, then upgrade to WebSocket
+        } else {
+            // Final attempt: Both transports
             return {
                 transports: ['polling', 'websocket'],
                 upgrade: true
-            };
-        } else {
-            // Final attempt: Polling only for maximum compatibility
-            return {
-                transports: ['polling'],
-                upgrade: false
             };
         }
     }

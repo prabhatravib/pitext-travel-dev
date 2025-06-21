@@ -22,17 +22,28 @@ def register_websocket_handlers(socketio):
     """
     logger.info("Registering enhanced WebSocket handlers...")
     
-    # Initialize handler instances
-    connection_handler = ConnectionHandler(socketio, NAMESPACE)
-    audio_handler = AudioHandler(socketio, NAMESPACE)
-    session_handler = SessionHandler(socketio, NAMESPACE)
-    
-    # Register handlers from each module
-    connection_handler.register_handlers()
-    audio_handler.register_handlers()
-    session_handler.register_handlers()
-    
-    logger.info("✅ Enhanced WebSocket handlers registered successfully")
+    try:
+        # Initialize handler instances
+        connection_handler = ConnectionHandler(socketio, NAMESPACE)
+        audio_handler = AudioHandler(socketio, NAMESPACE)
+        session_handler = SessionHandler(socketio, NAMESPACE)
+        
+        # Register handlers from each module
+        logger.info(f"Registering connection handler for namespace: {NAMESPACE}")
+        connection_handler.register_handlers()
+        
+        logger.info(f"Registering audio handler for namespace: {NAMESPACE}")
+        audio_handler.register_handlers()
+        
+        logger.info(f"Registering session handler for namespace: {NAMESPACE}")
+        session_handler.register_handlers()
+        
+        logger.info("✅ Enhanced WebSocket handlers registered successfully")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to register WebSocket handlers: {e}")
+        logger.exception("WebSocket registration error:")
+        raise
 
 
 # Export for backward compatibility
