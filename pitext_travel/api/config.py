@@ -127,3 +127,6 @@ def validate_realtime_config():
         raise ValueError(f"Invalid input audio format. Must be one of: {', '.join(valid_formats)}")
     
     return True
+
+def get_google_maps_api_key():
+    return os.getenv("GOOGLE_MAPS_API_KEY", "")

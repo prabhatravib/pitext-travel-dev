@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 openai.api_key = get_openai_api_key()
 # Allow overriding the chat model from the environment; fall back to a safe
 # default so that the service can still start without extra configuration.
-CHAT_MODEL_NAME = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+CHAT_MODEL_NAME = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1")
 
 # ---------------------------------------------------------------------------
 # Prompt construction helpers
