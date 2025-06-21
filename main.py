@@ -69,7 +69,7 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     async_mode="eventlet",
     logger=True,
-    engineio_logger=False,
+    engineio_logger=True,
     path="socket.io",
     ping_timeout=60,
     ping_interval=25
@@ -190,13 +190,13 @@ def _disconnect():
 if __name__ == "__main__":
     host  = os.getenv("HOST", "0.0.0.0")
     port  = int(os.getenv("PORT", 5000))
-    debug = os.getenv("FLASK_ENV") == "development"
+    is_debug = os.getenv("FLASK_ENV") == "development"
 
     logger.info("Starting travel app on %s:%s", host, port)
-    logger.info("Debug mode: %s", debug)
+    logger.info("Debug mode: %s", is_debug)
     logger.info("Blueprint loaded: %s", blueprint_loaded)
 
-    socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=True)
+    socketio.run(app, host=host, port=port, debug=is_debug, allow_unsafe_werkzeug=True)
 
 # For ASGI servers
 __all__ = ["app", "socketio"]
