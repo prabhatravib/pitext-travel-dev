@@ -1,10 +1,13 @@
 import concurrent.futures
 from flask import current_app
 import googlemaps
-# Corrected import path
-from pitext_travel.api.llm import generate_trip_itinerary, Stop
+from typing import TYPE_CHECKING
 
-def enhance_itinerary_with_geocoding(itinerary: generate_trip_itinerary, gmaps: googlemaps.Client) -> generate_trip_itinerary:
+if TYPE_CHECKING:
+    from pitext_travel.api.llm import Stop          # only for the type checker
+# Corrected import path
+
+def enhance_itinerary_with_geocoding(itinerary: dict, gmaps: googlemaps.Client) -> dict:
     """
     Enhances the itinerary by geocoding each stop to get coordinates and other details in parallel.
     """
