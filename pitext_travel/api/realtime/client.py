@@ -65,6 +65,8 @@ class RealtimeClient:
             if self.is_connected:
                 return True
 
+            logger.info(f"🚀 Starting OpenAI Realtime API connection for session {self.session_id}")
+            
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "OpenAI-Beta": "realtime=v1",
@@ -92,15 +94,20 @@ class RealtimeClient:
                 daemon=True,
             )
             self._thread.start()
+            logger.info(f"📡 WebSocket thread started for session {self.session_id}")
 
-            # Wait for connection - reduced timeout to match client expectations
-            timeout = 20  # Reduced from 50 to 20 seconds
+            # Wait for connection - increased timeout for better reliability
+            timeout = 30  # Increased from 20 to 30 seconds for better reliability
+            logger.info(f"⏱️ Waiting up to {timeout} seconds for OpenAI connection...")
+            
             while timeout > 0 and not self.is_connected:
                 threading.Event().wait(0.1)
                 timeout -= 1
+                if timeout % 10 == 0:  # Log every 10 seconds
+                    logger.info(f"⏱️ Still waiting for OpenAI connection... {timeout}s remaining")
 
             if not self.is_connected:
-                logger.error("Realtime API: connection timed out after 20 seconds")
+                logger.error("Realtime API: connection timed out after 30 seconds")
                 # Clean up failed connection
                 if self._ws_app:
                     try:

@@ -63,25 +63,31 @@ class SessionHandler(BaseWebSocketHandler):
 
                 # Activate (ie, open WS to the OpenAI Realtime API)
                 logger.info(f"🚀 Activating session {session_id}...")
+                logger.info(f"⏱️ Starting OpenAI Realtime API connection...")
+                
+                activation_start = time.time()
                 if not manager.activate_session(session_id):
-                    logger.error(f"❌ Failed to activate session {session_id}")
+                    activation_duration = time.time() - activation_start
+                    logger.error(f"❌ Failed to activate session {session_id} after {activation_duration:.2f}s")
                     self.emit_to_client("error", {
                         "message": "Failed to connect to OpenAI voice service. Please try again.",
                         "details": "The voice service is temporarily unavailable or experiencing high load."
                     })
                     return
 
-                logger.info(f"✅ Session {session_id} activated successfully")
+                activation_duration = time.time() - activation_start
+                logger.info(f"✅ Session {session_id} activated successfully in {activation_duration:.2f}s")
 
                 # Create and attach function handler
+                logger.info(f"🔧 Creating function handler for session {session_id}")
                 function_handler = create_function_handler(flask_session_id)
                 realtime_session.function_handler = function_handler
                 
                 # Get function definitions
                 functions = function_handler.get_function_definitions()
+                logger.info(f"🔧 Registering {len(functions)} functions with Realtime API")
                 
                 # Configure the Realtime session with travel functions
-                logger.info(f"🔧 Registering {len(functions)} functions with Realtime API")
                 realtime_session.client.update_session(
                     instructions=realtime_session.client.config["instructions"],
                     functions=functions,
@@ -89,6 +95,7 @@ class SessionHandler(BaseWebSocketHandler):
                 )
 
                 # Bridge callbacks → browser
+                logger.info(f"🔗 Wiring callbacks for session {session_id}")
                 wire_realtime_callbacks(self.socketio, realtime_session, request.sid, NAMESPACE)  # type: ignore
 
                 self.emit_to_client(
@@ -103,6 +110,8 @@ class SessionHandler(BaseWebSocketHandler):
                 logger.info("✅ Realtime session %s started with %d functions", session_id, len(functions))
 
             except Exception as exc:
+                logger.error(f"❌ Error in start_session: {exc}")
+                logger.exception("Session activation error:")
                 self.handle_error(exc, "start_session")
 
         @self.socketio.on("map_ready", namespace=NAMESPACE)

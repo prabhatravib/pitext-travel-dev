@@ -109,7 +109,7 @@ class RealtimeController {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error('Session activation timeout - OpenAI Realtime API connection failed'));
-            }, 25000); // 25 second timeout for session activation
+            }, 30000); // Increased to 30 seconds to match server timeout
             
             // Listen for session started event
             const sessionHandler = (data) => {
