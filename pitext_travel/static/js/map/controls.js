@@ -146,7 +146,10 @@ function clearDayControls() {
   if (controls) {
     controls.innerHTML = "";
   }
-  // Don't clear visibility state here - we want to preserve it
+  // Also reset the underlying visibility state.
+  // This is crucial for ensuring a clean slate when a new trip is rendered.
+  dayVisibility = {};
+  window.currentDayVisibility = {};
 }
 
 // Export these functions for other modules to use
