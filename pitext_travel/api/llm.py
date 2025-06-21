@@ -13,7 +13,9 @@ import logging
 import os
 from typing import Any, Dict, List
 
-import openai
+from openai import OpenAI
+
+client = OpenAI()                         # picks up OPENAI_API_KEY automatically
 
 from pitext_travel.api.config import get_openai_api_key
 from pitext_travel.api.geocoding import enhance_itinerary_with_geocoding
@@ -24,7 +26,6 @@ logger = logging.getLogger(__name__)
 # OpenAI client initialisation
 # ---------------------------------------------------------------------------
 
-openai.api_key = get_openai_api_key()
 # Allow overriding the chat model from the environment; fall back to a safe
 # default so that the service can still start without extra configuration.
 CHAT_MODEL_NAME = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1")
@@ -71,7 +72,7 @@ def generate_trip_itinerary(city: str, days: int) -> List[Dict[str, Any]]:
         days,
     )
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model='gpt-4.1',
         messages=messages,
         temperature=0.2,
