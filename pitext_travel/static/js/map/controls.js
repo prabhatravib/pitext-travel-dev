@@ -5,25 +5,18 @@
 //    so it will match the corresponding marker & route colour.
 // ----------------------------
 (function() {
-    // The redundant check for the Google Maps API has been removed.
-    // This is now handled centrally by `module-loader.js` to prevent
-    // race conditions and double-loading of scripts.
-
-    // Store current visibility state globally
-    window.currentDayVisibility = window.currentDayVisibility || {};
-
-    // Track which days are visible
-    let dayVisibility = {};
+    // This module now relies on TravelDayControls (day_controls_core.js)
+    // for all state management.
 
     /**
      * Render day control checkboxes
      *
      * @param {Array<Object>} days
-     *   Each element is { label?: string, color?: string, stops: [...] }.
-     *   We will ignore `day.color` here, and instead use getColourForDay().
+     *   Each element is { label?: string, stops: [...] }.
      */
     function renderDayControls(days) {
       const { debugLog } = window.TravelHelpers;
+      const { initializeDayVisibility, getDayVisibility } = window.TravelDayControls;
       debugLog("Rendering day controls for", days.length, "days");
 
       const controls = document.getElementById("day-controls");
@@ -32,22 +25,12 @@
         return;
       }
 
-      // CLEAR ANY EXISTING CONTROLS COMPLETELY
-      debugLog("Clearing existing day controls...");
-      while (controls.firstChild) {
-        controls.removeChild(controls.firstChild);
-      }
-      debugLog("Day controls cleared");
+      // Clear existing controls
+      clearDayControls();
 
-      // Initialize visibility: restore previous state or default to Day 1 only
-      dayVisibility = window.currentDayVisibility || {};
-      if (Object.keys(dayVisibility).length === 0) {
-        days.forEach((_, index) => {
-          dayVisibility[index] = index === 0;
-        });
-      }
-      window.currentDayVisibility = dayVisibility;
-
+      // Initialize visibility state using the core module
+      initializeDayVisibility(days.length, window.currentDayVisibility);
+      const dayVisibility = getDayVisibility();
       debugLog("Day visibility initialized:", dayVisibility);
 
       controls.style.display = "flex";
@@ -61,103 +44,51 @@
         wrapper.style.alignItems = "center";
         wrapper.style.gap = "0.3rem";
 
-        // 1) Create the <label> for Day (i+1)
         const label = document.createElement("label");
-
-        // Instead of using day.color, grab from our shared helper:
         const colour = window.TravelGoogleMaps.getColourForDay(i + 1);
 
-        label.style.color = colour;          // e.g. "#FFADAD" for Day 1, "#FFD6A5" for Day 2, etc.
+        label.style.color = colour;
         label.style.fontWeight = "bold";
         label.style.fontSize = "0.9rem";
         label.textContent = day.label || `Day ${i + 1}`;
         label.style.cursor = "pointer";
-        label.style.opacity = "1"; // Ensure label is fully visible
         label.setAttribute("for", `day-checkbox-${i}`);
 
-        // 2) Create the checkbox itself
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.id = `day-checkbox-${i}`;
-        checkbox.checked = dayVisibility[i] !== false;  // Use restored state
-        checkbox.disabled = false;  // ADD THIS LINE to ensure it's not disabled
+        checkbox.checked = dayVisibility[i] !== false;
         checkbox.style.cursor = "pointer";
         checkbox.style.width = "18px";
         checkbox.style.height = "18px";
+        checkbox.onchange = () => window.TravelDayControls.toggleDay(i);
 
-        // When toggled, this will show/hide markers & routes for this day
-        checkbox.onchange = () => toggleDay(i, days.length);
-
-        debugLog(`Created day control ${i + 1}: checked=${checkbox.checked}, disabled=${checkbox.disabled}`);
-
-        // 3) Assemble & append
         wrapper.appendChild(label);
         wrapper.appendChild(checkbox);
         controls.appendChild(wrapper);
+      });
+
+      // Listen for external visibility changes to update checkboxes
+      document.addEventListener('dayVisibilityChanged', (e) => {
+        const { dayIndex, visible } = e.detail;
+        const checkbox = document.getElementById(`day-checkbox-${dayIndex}`);
+        if (checkbox) {
+          checkbox.checked = visible;
+        }
       });
 
       debugLog(`Created ${days.length} day control checkboxes`);
     }
 
     /**
-     * Toggle visibility for a specific day
-     *
-     * @param {number} dayIndex
-     *   Zero-based index (0 → Day 1, 1 → Day 2, etc.)
-     * @param {number} totalDays
-     *  The total number of days in the trip
-     */
-    function toggleDay(dayIndex, totalDays) {
-      const { debugLog } = window.TravelHelpers;
-      const { toggleMarkersForDay } = window.TravelMarkers;
-      const { toggleRoutesForDay } = window.TravelRoutes;
-
-      debugLog(
-        `Toggling day ${dayIndex + 1} of ${totalDays}. New state: ${!dayVisibility[dayIndex]}`
-      );
-
-      // Update visibility state for the clicked day
-      dayVisibility[dayIndex] = !dayVisibility[dayIndex];
-      
-      // Save state globally
-      window.currentDayVisibility = dayVisibility;
-
-      debugLog(`Day ${dayIndex + 1} visibility set to: ${dayVisibility[dayIndex]}`);
-
-      // Update UI
-      if (toggleMarkersForDay) {
-        debugLog(`Calling toggleMarkersForDay(${dayIndex}, ${dayVisibility[dayIndex]})`);
-        toggleMarkersForDay(dayIndex, dayVisibility[dayIndex]);
-      } else {
-        debugLog("WARNING: toggleMarkersForDay function not available");
-      }
-
-      if (toggleRoutesForDay) {
-        debugLog(`Calling toggleRoutesForDay(${dayIndex}, ${dayVisibility[dayIndex]})`);
-        toggleRoutesForDay(dayIndex, dayVisibility[dayIndex]);
-      } else {
-        debugLog("WARNING: toggleRoutesForDay function not available");
-      }
-
-      // Also update the checkbox state visually
-      const checkbox = document.getElementById(`day-checkbox-${dayIndex}`);
-      if (checkbox) {
-        checkbox.checked = dayVisibility[dayIndex];
-        debugLog(`Updated checkbox ${dayIndex} to checked: ${dayVisibility[dayIndex]}`);
-      } else {
-        debugLog(`WARNING: Checkbox ${dayIndex} not found in DOM`);
-      }
-    }
-
-    /**
      * Get whether a given day is currently visible
      *
-     * @param {number} dayIndex
-     *   Zero-based index of the day
+     * @param {number} dayIndex - Zero-based index of the day
      * @returns {boolean}
      */
     function isDayVisible(dayIndex) {
-      return dayVisibility[dayIndex] !== false;
+      // Delegate to the core module
+      return window.TravelDayControls.getDayVisibility(dayIndex);
     }
 
     /**
@@ -166,21 +97,19 @@
     function clearDayControls() {
       const controls = document.getElementById("day-controls");
       if (controls) {
-        // CLEAR ANY EXISTING CONTROLS COMPLETELY
         while (controls.firstChild) {
           controls.removeChild(controls.firstChild);
         }
       }
-      // Also reset the underlying visibility state.
-      // This is crucial for ensuring a clean slate when a new trip is rendered.
-      dayVisibility = {};
-      window.currentDayVisibility = {};
+      // Delegate reset to the core module
+      if (window.TravelDayControls) {
+          window.TravelDayControls.resetVisibility();
+      }
     }
 
     // Export these functions for other modules to use
     window.TravelControls = {
       renderDayControls,
-      toggleDay,
       isDayVisible,
       clearDayControls
     };

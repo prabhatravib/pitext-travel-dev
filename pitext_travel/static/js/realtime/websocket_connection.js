@@ -17,6 +17,7 @@ class WebSocketConnection {
         this.connected = false;
         this.namespace = namespace;
         this.connecting = false; // Track connection state
+        this.connectionPromise = null;
         
         // Connection settings
         this.reconnectAttempts = 0;
@@ -34,33 +35,24 @@ class WebSocketConnection {
      * @returns {Promise} Resolves when connected, rejects on failure
      */
     connect() {
-        return new Promise((resolve, reject) => {
+        // If a connection attempt is already in progress, return its promise
+        if (this.connectionPromise) {
+            console.log('WebSocket connection attempt in progress, returning existing promise.');
+            return this.connectionPromise;
+        }
+
+        // Start a new connection attempt
+        this.connectionPromise = new Promise((resolve, reject) => {
             // Check if already connected
             if (this.connected && this.socket && this.socket.connected) {
-                console.log('WebSocket already connected, reusing existing connection');
+                console.log('WebSocket already connected, resolving immediately.');
                 resolve();
-                return;
-            }
-            
-            // Check if already connecting
-            if (this.connecting) {
-                console.log('WebSocket already connecting, waiting...');
-                // Wait for existing connection attempt
-                const checkConnection = () => {
-                    if (this.connected) {
-                        resolve();
-                    } else if (!this.connecting) {
-                        reject(new Error('Connection attempt failed'));
-                    } else {
-                        setTimeout(checkConnection, 100);
-                    }
-                };
-                checkConnection();
                 return;
             }
             
             // Check if Socket.IO is available
             if (!window.io) {
+                this.connectionPromise = null; // Clear promise
                 reject(new Error('Socket.IO client library not loaded'));
                 return;
             }
@@ -72,6 +64,10 @@ class WebSocketConnection {
                 // Create connection with timeout
                 const timeoutId = setTimeout(() => {
                     this.connecting = false;
+                    this.connectionPromise = null; // Clear promise on timeout
+                    if (this.socket) {
+                        this.socket.disconnect();
+                    }
                     reject(new Error('Connection timeout'));
                 }, this.connectionTimeout);
 
@@ -84,7 +80,7 @@ class WebSocketConnection {
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
                     timeout: 20000,
-                    forceNew: false  // Changed from true to false to prevent duplicate connections
+                    forceNew: false
                 });
                 
                 // Handle connection success
@@ -103,6 +99,7 @@ class WebSocketConnection {
                     console.error('WebSocket connection error:', error);
                     this.connected = false;
                     this.connecting = false;
+                    this.connectionPromise = null; // Clear promise on error
                     
                     this.reconnectAttempts++;
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -112,10 +109,13 @@ class WebSocketConnection {
                 
             } catch (error) {
                 this.connecting = false;
+                this.connectionPromise = null; // Clear promise on exception
                 console.error('Failed to create WebSocket connection:', error);
                 reject(error);
             }
         });
+
+        return this.connectionPromise;
     }
     
     /**
@@ -124,10 +124,12 @@ class WebSocketConnection {
     disconnect() {
         if (this.socket) {
             this.socket.disconnect();
-            this.socket = null;
-            this.connected = false;
-            console.log('WebSocket disconnected');
         }
+        this.socket = null;
+        this.connected = false;
+        this.connecting = false;
+        this.connectionPromise = null; // Also clear promise on disconnect
+        console.log('WebSocket disconnected');
     }
     
     /**
