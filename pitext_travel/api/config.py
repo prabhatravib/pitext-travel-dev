@@ -45,6 +45,26 @@ turn_cfg = TurnDetection(
 # NEW: Realtime API Configuration
 def get_realtime_config():
     """Get OpenAI Realtime API configuration."""
+    vad_silence_ms = int(os.getenv("REALTIME_VAD_SILENCE_MS", 2000))
+    vad_threshold = float(os.getenv("REALTIME_VAD_THRESHOLD", 0.5))
+    
+    # --- BEGIN DEBUG LOGGING ---
+    print("="*50)
+    print("🔧 VAD CONFIGURATION LOADED 🔧")
+    print(f"   - Silence Duration (ms): {vad_silence_ms}")
+    print(f"   - Threshold:             {vad_threshold}")
+    print("="*50)
+    # --- END DEBUG LOGGING ---
+
+    turn_cfg = TurnDetection(
+        type="server_vad",
+        threshold=vad_threshold,
+        prefix_padding_ms=300,
+        silence_duration_ms=vad_silence_ms,
+        create_response=True,
+        interrupt_response=True,
+    )
+
     return {
         # Model configuration
         "model": os.getenv("OPENAI_REALTIME_MODEL", "gpt-4o-realtime-preview-2024-12-17"),
@@ -55,9 +75,9 @@ def get_realtime_config():
         "max_response_duration_ms": int(os.getenv("REALTIME_MAX_RESPONSE_DURATION_MS", "30000")),
         
         # Voice Activity Detection (VAD) configuration - Conservative settings
-        "vad_threshold": float(os.getenv("REALTIME_VAD_THRESHOLD", "0.5")),  # Standard threshold
+        "vad_threshold": vad_threshold,
         "vad_prefix_ms": int(os.getenv("REALTIME_VAD_PREFIX_MS", "300")),
-        "vad_silence_ms": int(os.getenv("REALTIME_VAD_SILENCE_MS", "5000")),  # 5 seconds of silence
+        "vad_silence_ms": vad_silence_ms,
         
         # Session configuration
         "session_timeout_seconds": int(os.getenv("REALTIME_SESSION_TIMEOUT_SECONDS", "600")),
