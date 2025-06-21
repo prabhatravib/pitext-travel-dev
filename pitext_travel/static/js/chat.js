@@ -45,8 +45,16 @@ class Chat {
       this.currentTranscriptText = '';
     }
     
-    // Accumulate the text
-    this.currentTranscriptText += text;
+    // Accumulate or replace text depending on whether this is the final chunk
+    if (is_final) {
+      // The "done" event from OpenAI includes the *entire* transcript,
+      // so we should REPLACE the current text to avoid duplicating the
+      // earlier deltas that we have already appended.
+      this.currentTranscriptText = text;
+    } else {
+      // Incremental delta – append only the new chunk
+      this.currentTranscriptText += text;
+    }
     
     // Create or update the current transcript bubble
     if (!this.currentTranscriptBubble) {
@@ -54,22 +62,22 @@ class Chat {
       this.currentTranscriptBubble.classList.add('transcript-active');
     }
     
-    // Update the bubble content with accumulated text
+    // Update the bubble content with accumulated text (formatted)
     const formattedText = this.currentTranscriptText
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br>');
     
     this.currentTranscriptBubble.innerHTML = formattedText;
     
-    // If this is the final transcript, finalize it
+    // If this was the final message, freeze the bubble and reset tracking
     if (is_final) {
       this.finalizeCurrentTranscript();
     }
     
-    // Auto-scroll to show new content
+    // Auto-scroll so the latest transcript is visible
     setTimeout(() => {
       if (this.currentTranscriptBubble && this.currentTranscriptBubble.scrollIntoView) {
-        this.currentTranscriptBubble.scrollIntoView({behavior: 'smooth', block: 'end'});
+        this.currentTranscriptBubble.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
     }, 50);
   }
