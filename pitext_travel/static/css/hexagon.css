@@ -1,4 +1,4 @@
-/* static/css/hexagon-glow.css  –  Neon-glass variant */
+/* static/css/hexagon.css - Simple Hexagon Interface */
 
 /* ===== Hexagon container ============================================= */
 .hexagon-interface {
@@ -11,7 +11,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2.25rem;
+  padding: 2rem;
   z-index: 10040;
 
   /* shape */
@@ -19,41 +19,12 @@
       50% 0%,  92% 22%,  92% 78%,
       50% 100%, 8% 78%,  8% 22%
   );
-  border-radius: 18px;          /* rounds the polygon's corners */
-  background: rgba(14, 24, 35, 0.45);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
-  box-shadow:
-      0 0 18px rgba(0, 0, 0, 0.65),
-      0 6px 24px rgba(0, 0, 0, 0.35);
-  overflow: hidden;             /* keeps the glow inside */
-}
-
-/* neon edge (outer, softly blurred) */
-.hexagon-interface::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  z-index: -1;
-  background: linear-gradient(135deg, #00d9ff 0%, #ff18ac 100%);
-  filter: blur(12px);
-  clip-path: inherit;           /* identical hexagon */
-}
-
-/* crisp inner stroke (subtle) */
-.hexagon-interface::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  padding: 2px;                 /* stroke thickness */
-  border-radius: inherit;
-  background: linear-gradient(135deg, #00d9ff 0%, #ff18ac 100%);
-  -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;  /* cuts the centre */
-          mask-composite: exclude;
-  clip-path: inherit;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* ===== Layout inside the hexagon ==================================== */
@@ -64,71 +35,55 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.75rem;
+  gap: 1.5rem;
   text-align: center;
 }
 
 /* header */
 .hexagon-header {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 500;
-  color: #ffffff;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  color: #333;
   line-height: 1.25;
   pointer-events: none;
 }
 
 /* ===== Mic button ==================================================== */
 .hex-mic-button {
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   position: relative;
-  background: rgba(255, 255, 255, 0.07);
-  border: 4px solid rgba(255, 255, 255, 0.1);
+  background: #1976d2;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.25s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .hex-mic-button:hover {
-  transform: scale(1.06);
+  background: #1565c0;
+  transform: scale(1.05);
 }
 
-/* neon ring */
-.hex-mic-button::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #00d9ff 0%, #ff18ac 100%);
-  filter: blur(8px);
-  z-index: -1;
+.hex-mic-button.listening {
+  background: #4caf50;
+  animation: pulse 2s infinite;
 }
 
-/* animated pulse when listening */
-.hex-mic-button.listening::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #00d9ff 0%, #ff18ac 100%);
-  animation: pulse-ring 2s infinite;
-}
-
-@keyframes pulse-ring {
-  0%   { transform: scale(1);   opacity: 0.9; }
-  70%  { transform: scale(1.45); opacity: 0; }
-  100% { transform: scale(1);   opacity: 0; }
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+  70%  { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 }
 
 .hex-mic-button svg {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   fill: #ffffff;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
 }
 
 /* ===== Inputs ======================================================== */
@@ -136,63 +91,60 @@
   width: 90%;
   max-width: 260px;
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .hex-inputs input {
   flex: 1;
-  padding: 0.55rem 0.8rem;
-  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
   font-size: 0.9rem;
   text-align: center;
-
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  color: #333;
 }
 
-.hex-inputs input::placeholder { color: #aaa; }
+.hex-inputs input::placeholder { 
+  color: #999; 
+}
 
 .hex-inputs input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 0 2px #00d9ff66;
+  background: #fff;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
 }
 
 /* ===== Launch button ================================================= */
 .hex-launch-button {
   width: 90%;
   max-width: 260px;
-  padding: 0.85rem 1rem;
-  border-radius: 30px;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
   border: none;
   cursor: pointer;
-
-  background: linear-gradient(135deg, #00d9ff 0%, #ff18ac 100%);
-  box-shadow:
-      0 0 12px rgba(0, 217, 255, 0.6),
-      0 0 18px rgba(255, 24, 172, 0.5),
-      inset 0 1px 2px rgba(255, 255, 255, 0.3);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: #1976d2;
+  color: #fff;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .hex-launch-button:hover {
-  transform: translateY(-2px);
-  box-shadow:
-      0 0 18px rgba(0, 217, 255, 0.75),
-      0 0 26px rgba(255, 24, 172, 0.65),
-      inset 0 1px 3px rgba(255, 255, 255, 0.4);
+  background: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.hex-launch-button:active { transform: translateY(0); }
+.hex-launch-button:active { 
+  transform: translateY(0); 
+}
 
-/* ===== Day controls (unchanged apart from colours) =================== */
+/* ===== Day controls =================================================== */
 #day-controls {
   display: flex !important;
   position: fixed;
@@ -201,15 +153,17 @@
   gap: 1.5rem;
   flex-wrap: wrap;
   padding: 1rem 1.5rem;
-
-  background: rgba(14, 24, 35, 0.55);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border-radius: 14px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-#day-controls label { color: #fff; }
+#day-controls label { 
+  color: #333; 
+}
 
 /* ===== Mobile adjustments =========================================== */
 @media (max-width: 768px) {
@@ -218,21 +172,49 @@
     height: 345px;
     bottom: 1rem;
     left: 1rem;
+    padding: 1.5rem;
   }
 
-  .hex-mic-button { width: 100px; height: 100px; }
-  .hex-mic-button svg { width: 32px; height: 32px; }
+  .hex-mic-button { 
+    width: 80px; 
+    height: 80px; 
+  }
+  
+  .hex-mic-button svg { 
+    width: 24px; 
+    height: 24px; 
+  }
 
-  .hex-inputs      { max-width: 220px; }
-  .hex-launch-button { max-width: 220px; }
+  .hex-inputs { 
+    max-width: 220px; 
+  }
+  
+  .hex-launch-button { 
+    max-width: 220px; 
+  }
 
-  #day-controls { bottom: 1rem; right: 1rem; padding: 0.75rem 1rem; }
+  #day-controls { 
+    bottom: 1rem; 
+    right: 1rem; 
+    padding: 0.75rem 1rem; 
+  }
 }
 
-/* ===== State-based pulses if you already toggle classes ============== */
-.hexagon-interface.processing { animation: glow-process 2.5s ease-in-out infinite; }
-
-@keyframes glow-process {
-  0%, 100% { filter: brightness(1) saturate(1.2); }
-  50%      { filter: brightness(1.3) saturate(1.6); }
+/* ===== State-based animations ======================================== */
+.hexagon-interface.processing { 
+  animation: processing 2s ease-in-out infinite; 
 }
+
+@keyframes processing {
+  0%, 100% { 
+    opacity: 1; 
+  }
+  50% { 
+    opacity: 0.8; 
+  }
+}
+
+/* Hide the regular voice button when hexagon is active */
+.voice-button {
+  display: none !important;
+} 
