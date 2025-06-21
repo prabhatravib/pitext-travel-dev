@@ -90,8 +90,8 @@ class RealtimeController {
             this.connected = true;
             this._trigger('connected');
             
-            // Start Realtime session
-            this.wsClient.startSession();
+            // Start Realtime session with timeout
+            await this._startSessionWithTimeout();
             
             return true;
             
@@ -100,6 +100,43 @@ class RealtimeController {
             this._trigger('error', { error });
             return false;
         }
+    }
+    
+    /**
+     * Start session with timeout handling
+     */
+    async _startSessionWithTimeout() {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Session activation timeout - OpenAI Realtime API connection failed'));
+            }, 25000); // 25 second timeout for session activation
+            
+            // Listen for session started event
+            const sessionHandler = (data) => {
+                clearTimeout(timeout);
+                this.wsClient.off('session_started', sessionHandler);
+                this.wsClient.off('error', errorHandler);
+                console.log('✅ Session activated successfully:', data);
+                this._trigger('ready');
+                resolve(data);
+            };
+            
+            // Listen for session errors
+            const errorHandler = (error) => {
+                clearTimeout(timeout);
+                this.wsClient.off('session_started', sessionHandler);
+                this.wsClient.off('error', errorHandler);
+                console.error('❌ Session activation failed:', error);
+                reject(new Error(`Session activation failed: ${error.message || error}`));
+            };
+            
+            this.wsClient.on('session_started', sessionHandler);
+            this.wsClient.on('error', errorHandler);
+            
+            // Start the session
+            console.log('🚀 Initiating session activation...');
+            this.wsClient.startSession();
+        });
     }
     
     disconnect() {

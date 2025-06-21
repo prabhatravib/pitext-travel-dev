@@ -263,7 +263,20 @@ class VoiceUI {
         // Handle errors
         this.controller.on('error', (error) => {
             console.error('🚫 Voice error:', error);
-            this.updateStatus('Voice error - Click to retry', 'error');
+            
+            // Provide more specific error messages
+            let errorMessage = 'Voice error - Click to retry';
+            if (error && error.message) {
+                if (error.message.includes('Session activation timeout')) {
+                    errorMessage = 'OpenAI service timeout - Click to retry';
+                } else if (error.message.includes('Connection timeout')) {
+                    errorMessage = 'Connection timeout - Click to retry';
+                } else if (error.message.includes('Session activation failed')) {
+                    errorMessage = 'Voice service unavailable - Click to retry';
+                }
+            }
+            
+            this.updateStatus(errorMessage, 'error');
             this.isListening = false;
             this.isAssistantSpeaking = false;
             this.updateButtonState();

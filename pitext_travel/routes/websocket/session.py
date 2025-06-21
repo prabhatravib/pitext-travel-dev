@@ -65,7 +65,10 @@ class SessionHandler(BaseWebSocketHandler):
                 logger.info(f"🚀 Activating session {session_id}...")
                 if not manager.activate_session(session_id):
                     logger.error(f"❌ Failed to activate session {session_id}")
-                    self.emit_to_client("error", {"message": "Failed to activate session"})
+                    self.emit_to_client("error", {
+                        "message": "Failed to connect to OpenAI voice service. Please try again.",
+                        "details": "The voice service is temporarily unavailable or experiencing high load."
+                    })
                     return
 
                 logger.info(f"✅ Session {session_id} activated successfully")

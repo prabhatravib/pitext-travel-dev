@@ -93,14 +93,26 @@ class RealtimeClient:
             )
             self._thread.start()
 
-            # Wait for connection
-            timeout = 50
+            # Wait for connection - reduced timeout to match client expectations
+            timeout = 20  # Reduced from 50 to 20 seconds
             while timeout > 0 and not self.is_connected:
                 threading.Event().wait(0.1)
                 timeout -= 1
 
             if not self.is_connected:
-                logger.error("Realtime API: connection timed out")
+                logger.error("Realtime API: connection timed out after 20 seconds")
+                # Clean up failed connection
+                if self._ws_app:
+                    try:
+                        self._ws_app.close()
+                    except Exception:
+                        pass
+                    self._ws_app = None
+                if self._thread and self._thread.is_alive():
+                    self._thread.join(timeout=1.0)
+                    self._thread = None
+            else:
+                logger.info("Realtime API: connection established successfully")
             return self.is_connected
 
     def disconnect(self):

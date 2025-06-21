@@ -174,21 +174,28 @@ class SessionManager:
         """
         session = self.get_session(session_id)
         if not session:
+            logger.error(f"Session {session_id} not found for activation")
             return False
         
         try:
-            # Connect to Realtime API
+            logger.info(f"🚀 Attempting to connect to OpenAI Realtime API for session {session_id}")
+            
+            # Connect to Realtime API with timeout
+            start_time = time.time()
             if session.client.connect():
+                duration = time.time() - start_time
                 session.is_active = True
                 session.connected_at = datetime.now()
-                logger.info(f"Activated session {session_id}")
+                logger.info(f"✅ Successfully activated session {session_id} in {duration:.2f}s")
                 return True
             else:
-                logger.error(f"Failed to connect session {session_id}")
+                duration = time.time() - start_time
+                logger.error(f"❌ Failed to connect session {session_id} after {duration:.2f}s")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error activating session {session_id}: {e}")
+            duration = time.time() - start_time if 'start_time' in locals() else 0
+            logger.error(f"❌ Error activating session {session_id} after {duration:.2f}s: {e}")
             return False
     
     def deactivate_session(self, session_id: str, reason: str = "manual"):

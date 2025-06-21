@@ -19,10 +19,10 @@ class WebSocketConnection {
         this.connecting = false; // Track connection state
         this.connectionPromise = null;
         
-        // Connection settings
+        // Connection settings - optimized for Render
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-        this.connectionTimeout = 30000; // 30 seconds - increased for reliability
+        this.maxReconnectAttempts = 3; // Reduced for faster fallback
+        this.connectionTimeout = 15000; // Reduced to 15 seconds for faster failure detection
         
         // Store this instance globally
         window.WebSocketConnections[namespace] = this;
@@ -31,7 +31,7 @@ class WebSocketConnection {
     }
     
     /**
-     * Establish WebSocket connection
+     * Establish WebSocket connection with fallback strategy
      * @returns {Promise} Resolves when connected, rejects on failure
      */
     connect() {
@@ -57,107 +57,139 @@ class WebSocketConnection {
                 return;
             }
 
-            try {
-                console.log(`Attempting to connect to ${this.namespace}...`);
-                this.connecting = true;
-                
-                // Create connection with timeout
-                const timeoutId = setTimeout(() => {
-                    this.connecting = false;
-                    this.connectionPromise = null; // Clear promise on timeout
-                    if (this.socket) {
-                        this.socket.disconnect();
-                    }
-                    console.error(`Connection timeout after ${this.connectionTimeout}ms`);
-                    reject(new Error('Connection timeout'));
-                }, this.connectionTimeout);
-
-                // Connect to WebSocket namespace with more detailed options
-                this.socket = io(this.namespace, {
-                    transports: ['websocket'], // FORCE WebSocket only - no polling fallback
-                    path: '/socket.io',
-                    reconnection: true,
-                    reconnectionAttempts: this.maxReconnectAttempts,
-                    reconnectionDelay: 1000,
-                    reconnectionDelayMax: 5000,
-                    timeout: 30000, // Increase timeout
-                    forceNew: false,
-                    // Add additional debugging
-                    autoConnect: true,
-                    upgrade: true,
-                    rememberUpgrade: true,
-                    pingTimeout: 60000,
-                    pingInterval: 25000
-                });
-                
-                // Handle connection success
-                this.socket.on('connect', () => {
-                    clearTimeout(timeoutId);
-                    this.connected = true;
-                    this.connecting = false;
-                    this.reconnectAttempts = 0;
-                    console.log('WebSocket connected successfully');
-                    resolve();
-                });
-                
-                // Handle connection failure
-                this.socket.on('connect_error', (error) => {
-                    clearTimeout(timeoutId);
-                    console.error('WebSocket connection error:', error);
-                    this.connected = false;
-                    this.connecting = false;
-                    this.connectionPromise = null; // Clear promise on error
-                    
-                    this.reconnectAttempts++;
-                    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                        // Try fallback to default namespace
-                        if (this.namespace !== '/') {
-                            console.log('Trying fallback to default namespace...');
-                            this.namespace = '/';
-                            this.socket = io('/', {
-                                transports: ['polling', 'websocket'],
-                                path: '/socket.io',
-                                timeout: 30000
-                            });
-                            
-                            this.socket.on('connect', () => {
-                                this.connected = true;
-                                this.connecting = false;
-                                console.log('Connected to default namespace as fallback');
-                                resolve();
-                            });
-                            
-                            this.socket.on('connect_error', (fallbackError) => {
-                                console.error('Fallback connection also failed:', fallbackError);
-                                reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
-                            });
-                        } else {
-                            reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
-                        }
-                    }
-                });
-                
-                // Handle transport errors
-                this.socket.on('error', (error) => {
-                    console.error('WebSocket transport error:', error);
-                });
-                
-                // Handle disconnect
-                this.socket.on('disconnect', (reason) => {
-                    console.log('WebSocket disconnected:', reason);
-                    this.connected = false;
-                    this.connecting = false;
-                });
-                
-            } catch (error) {
-                this.connecting = false;
-                this.connectionPromise = null; // Clear promise on exception
-                console.error('Failed to create WebSocket connection:', error);
-                reject(error);
-            }
+            this._attemptConnection(resolve, reject);
         });
 
         return this.connectionPromise;
+    }
+    
+    /**
+     * Attempt connection with progressive fallback strategy
+     */
+    _attemptConnection(resolve, reject) {
+        try {
+            console.log(`Attempting to connect to ${this.namespace} (attempt ${this.reconnectAttempts + 1})...`);
+            this.connecting = true;
+            
+            // Create connection with timeout
+            const timeoutId = setTimeout(() => {
+                this.connecting = false;
+                this.connectionPromise = null; // Clear promise on timeout
+                if (this.socket) {
+                    this.socket.disconnect();
+                }
+                console.error(`Connection timeout after ${this.connectionTimeout}ms`);
+                this._handleConnectionFailure(resolve, reject, 'timeout');
+            }, this.connectionTimeout);
+
+            // Progressive transport strategy for Render compatibility
+            const transportStrategy = this._getTransportStrategy();
+            console.log(`Using transport strategy: ${transportStrategy.transports.join(', ')}`);
+            
+            // Connect to WebSocket namespace
+            this.socket = io(this.namespace, {
+                ...transportStrategy,
+                path: '/socket.io',
+                reconnection: false, // We handle reconnection manually
+                timeout: this.connectionTimeout,
+                forceNew: true, // Force new connection to avoid cached issues
+                autoConnect: true,
+                upgrade: transportStrategy.transports.includes('polling'),
+                rememberUpgrade: false, // Don't remember upgrade to avoid issues
+                pingTimeout: 60000,
+                pingInterval: 25000
+            });
+            
+            // Handle connection success
+            this.socket.on('connect', () => {
+                clearTimeout(timeoutId);
+                this.connected = true;
+                this.connecting = false;
+                this.reconnectAttempts = 0;
+                console.log(`✅ WebSocket connected successfully using ${transportStrategy.transports.join(', ')}`);
+                resolve();
+            });
+            
+            // Handle connection failure
+            this.socket.on('connect_error', (error) => {
+                clearTimeout(timeoutId);
+                console.error('WebSocket connection error:', error);
+                this.connected = false;
+                this.connecting = false;
+                this._handleConnectionFailure(resolve, reject, error.message);
+            });
+            
+            // Handle transport errors
+            this.socket.on('error', (error) => {
+                console.error('WebSocket transport error:', error);
+            });
+            
+            // Handle disconnect
+            this.socket.on('disconnect', (reason) => {
+                console.log('WebSocket disconnected:', reason);
+                this.connected = false;
+                this.connecting = false;
+            });
+            
+        } catch (error) {
+            this.connecting = false;
+            this.connectionPromise = null; // Clear promise on exception
+            console.error('Failed to create WebSocket connection:', error);
+            this._handleConnectionFailure(resolve, reject, error.message);
+        }
+    }
+    
+    /**
+     * Get transport strategy based on attempt number
+     */
+    _getTransportStrategy() {
+        if (this.reconnectAttempts === 0) {
+            // First attempt: Try WebSocket only
+            return {
+                transports: ['websocket'],
+                upgrade: false
+            };
+        } else if (this.reconnectAttempts === 1) {
+            // Second attempt: Try polling first, then upgrade to WebSocket
+            return {
+                transports: ['polling', 'websocket'],
+                upgrade: true
+            };
+        } else {
+            // Final attempt: Polling only for maximum compatibility
+            return {
+                transports: ['polling'],
+                upgrade: false
+            };
+        }
+    }
+    
+    /**
+     * Handle connection failure with fallback logic
+     */
+    _handleConnectionFailure(resolve, reject, errorMessage) {
+        this.reconnectAttempts++;
+        
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            console.log(`Connection failed, attempting fallback (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+            
+            // Clear current socket
+            if (this.socket) {
+                this.socket.disconnect();
+                this.socket = null;
+            }
+            
+            // Try again with different strategy
+            setTimeout(() => {
+                this._attemptConnection(resolve, reject);
+            }, 1000);
+            
+        } else {
+            // All attempts failed
+            console.error(`All connection attempts failed after ${this.maxReconnectAttempts} tries`);
+            this.connectionPromise = null;
+            reject(new Error(`Connection failed after ${this.maxReconnectAttempts} attempts: ${errorMessage}`));
+        }
     }
     
     /**
