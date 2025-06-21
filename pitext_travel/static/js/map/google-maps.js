@@ -47,8 +47,7 @@
             zoomControl: true,
             scaleControl: true,
             streetViewControl: true,
-            fullscreenControl: true,
-            styles: MAP_STYLES
+            fullscreenControl: true
         });
 
         // Initialize directions service
