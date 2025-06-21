@@ -58,8 +58,11 @@ def create_travel_blueprint(base_dir):
             days = data.get("days", 3)
             
             try:
-                itinerary = generate_trip_itinerary(city, days)
-                
+                itinerary = {
+                                "days": generate_trip_itinerary(city, days),
+                                "metadata": {"city": city, "days": days}
+                            }
+
                 # Store in session
                 session['current_itinerary'] = itinerary
                 session['current_city'] = city
@@ -75,7 +78,11 @@ def create_travel_blueprint(base_dir):
                 return jsonify(itinerary)
             else:
                 # Return default itinerary
-                return jsonify(generate_trip_itinerary("Paris", 3))
+                    itinerary = {
+                                "days": generate_trip_itinerary("Paris", 3),
+                                "metadata": {"city": "Paris", "days": 3}
+                            }
+            return jsonify(itinerary)
     
     @travel_bp.route("/health")
     def health():
