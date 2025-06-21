@@ -21,6 +21,8 @@ class SessionHandler(BaseWebSocketHandler):
         def handle_start_session(data):
             """Start OpenAI Realtime API session with enhanced initialization."""
             session_id = session.get("realtime_session_id")
+            logger.info(f"🔍 start_session called - session_id: {session_id}, session keys: {list(session.keys())}")
+            
             if not session_id:
                 self.emit_to_client("error", {"message": "No session available"})
                 logger.error("❌ No realtime_session_id in session")

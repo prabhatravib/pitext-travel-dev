@@ -65,6 +65,24 @@ class RealtimeController {
             // Connect WebSocket
             await this.wsClient.connect();
             
+            // Wait for the 'connected' event from the server before proceeding
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Connection timeout - no connected event received'));
+                }, 10000);
+                
+                this.wsClient.on('connected', (data) => {
+                    clearTimeout(timeout);
+                    console.log('✅ Server confirmed connection:', data);
+                    resolve(data);
+                });
+                
+                this.wsClient.on('error', (error) => {
+                    clearTimeout(timeout);
+                    reject(error);
+                });
+            });
+            
             // Start continuous audio capture
             this.audioCapture.start();
             this.audioCapture.setEnabled(true);  // Enable immediately

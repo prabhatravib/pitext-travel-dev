@@ -82,7 +82,8 @@ class WebSocketClient {
     // WebSocket API methods
     
     startSession() {
-        console.log('Starting Realtime session...');
+        console.log('🚀 Starting Realtime session...');
+        console.log('🔍 Connection state:', this.connection.getConnectionState());
         return this.emit('start_session', {});
     }
 

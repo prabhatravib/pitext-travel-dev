@@ -29,14 +29,44 @@ class ConnectionHandler(BaseWebSocketHandler):
                     session['_id'] = client_info['flask_session_id']
                     session.modified = True
                 
-                # For now, just acknowledge the connection without complex session management
-                logger.info(f"✅ WebSocket connected: {client_info['sid']}")
-                
-                self.emit_to_client('connected', {
-                    'session_id': client_info['sid'],
-                    'status': 'connected',
-                    'flask_session_id': session['_id']
-                })
+                # Create Realtime session with error handling
+                try:
+                    from pitext_travel.api.realtime.session_manager import get_session_manager
+                    
+                    manager = get_session_manager()
+                    realtime_session = manager.create_session(
+                        client_info['ip'], 
+                        session['_id']
+                    )
+                    
+                    if not realtime_session:
+                        logger.error("❌ Failed to create realtime session - rate limited")
+                        self.emit_to_client('error', {
+                            'message': 'Rate limit exceeded or server at capacity'
+                        })
+                        disconnect()
+                        return
+                    
+                    # Store session ID in SocketIO session
+                    session['realtime_session_id'] = realtime_session.session_id
+                    
+                    logger.info(f"✅ Session ready: {realtime_session.session_id}")
+                    logger.info(f"🔍 Session keys after setup: {list(session.keys())}")
+                    
+                    self.emit_to_client('connected', {
+                        'session_id': realtime_session.session_id,
+                        'status': 'connected',
+                        'flask_session_id': session['_id']
+                    })
+                    
+                except ImportError as e:
+                    logger.warning(f"Session manager not available: {e}")
+                    # Fallback to basic connection
+                    self.emit_to_client('connected', {
+                        'session_id': client_info['sid'],
+                        'status': 'connected_basic',
+                        'flask_session_id': session['_id']
+                    })
                 
             except Exception as e:
                 logger.error(f"Connection error: {e}")
@@ -50,8 +80,12 @@ class ConnectionHandler(BaseWebSocketHandler):
             
             if session_id:
                 try:
-                    # For now, just log the disconnect without complex session management
-                    logger.info(f"🔌 WebSocket disconnected, session {session_id}")
+                    from pitext_travel.api.realtime.session_manager import get_session_manager
+                    manager = get_session_manager()
+                    manager.deactivate_session(session_id, 'client_disconnect')
+                    logger.info(f"🔌 WebSocket disconnected, session {session_id} deactivated")
+                except ImportError:
+                    logger.warning("Session manager not available during disconnect")
                 except Exception as e:
                     self.handle_error(e, 'disconnect')
             else:
