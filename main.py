@@ -70,7 +70,9 @@ socketio = SocketIO(
     async_mode="eventlet",
     logger=True,
     engineio_logger=False,
-    path="socket.io"
+    path="socket.io",
+    ping_timeout=60,
+    ping_interval=25
 )
 logger.info("Socket.IO initialised (async_mode=eventlet)")
 

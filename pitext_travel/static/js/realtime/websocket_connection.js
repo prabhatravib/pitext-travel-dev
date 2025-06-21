@@ -22,7 +22,7 @@ class WebSocketConnection {
         // Connection settings
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.connectionTimeout = 10000; // 10 seconds
+        this.connectionTimeout = 30000; // 30 seconds - increased for reliability
         
         // Store this instance globally
         window.WebSocketConnections[namespace] = this;
@@ -74,18 +74,20 @@ class WebSocketConnection {
 
                 // Connect to WebSocket namespace with more detailed options
                 this.socket = io(this.namespace, {
-                    transports: ['websocket', 'polling'],
-                    path: '/socket.io', 
+                    transports: ['websocket'], // FORCE WebSocket only - no polling fallback
+                    path: '/socket.io',
                     reconnection: true,
                     reconnectionAttempts: this.maxReconnectAttempts,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
-                    timeout: 20000,
+                    timeout: 30000, // Increase timeout
                     forceNew: false,
                     // Add additional debugging
                     autoConnect: true,
                     upgrade: true,
-                    rememberUpgrade: true
+                    rememberUpgrade: true,
+                    pingTimeout: 60000,
+                    pingInterval: 25000
                 });
                 
                 // Handle connection success
@@ -108,7 +110,30 @@ class WebSocketConnection {
                     
                     this.reconnectAttempts++;
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                        reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
+                        // Try fallback to default namespace
+                        if (this.namespace !== '/') {
+                            console.log('Trying fallback to default namespace...');
+                            this.namespace = '/';
+                            this.socket = io('/', {
+                                transports: ['polling', 'websocket'],
+                                path: '/socket.io',
+                                timeout: 30000
+                            });
+                            
+                            this.socket.on('connect', () => {
+                                this.connected = true;
+                                this.connecting = false;
+                                console.log('Connected to default namespace as fallback');
+                                resolve();
+                            });
+                            
+                            this.socket.on('connect_error', (fallbackError) => {
+                                console.error('Fallback connection also failed:', fallbackError);
+                                reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
+                            });
+                        } else {
+                            reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
+                        }
                     }
                 });
                 
