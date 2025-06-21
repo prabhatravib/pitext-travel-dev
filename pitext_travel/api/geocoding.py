@@ -87,12 +87,19 @@ def enhance_itinerary_with_geocoding(itinerary: List[Dict[str, Any]]) -> List[Di
             if not name:
                 continue
 
-            # Skip if coords already present
-            has_coords = (
-                ("lat" in stop and "lng" in stop) if isinstance(stop, dict)
-                else hasattr(stop, "lat") and hasattr(stop, "lng")
-            )
-            if has_coords:
+            # Check if valid coords already present (not null/None)
+            has_valid_coords = False
+            if isinstance(stop, dict):
+                lat = stop.get("lat")
+                lng = stop.get("lng")
+                has_valid_coords = lat is not None and lng is not None and lat != "null" and lng != "null"
+            else:
+                lat = getattr(stop, "lat", None)
+                lng = getattr(stop, "lng", None)
+                has_valid_coords = lat is not None and lng is not None and lat != "null" and lng != "null"
+            
+            if has_valid_coords:
+                logger.debug(f"Skipping geocoding for '{name}' - already has valid coordinates")
                 continue
 
             coords = get_coordinates_for_place(name)
@@ -109,8 +116,6 @@ def enhance_itinerary_with_geocoding(itinerary: List[Dict[str, Any]]) -> List[Di
                 setattr(stop, "lng", lng)
 
     return itinerary
-
-
 # Re-export for clean imports elsewhere
 __all__ = [
     "get_coordinates_for_place",
