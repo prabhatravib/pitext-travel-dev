@@ -148,8 +148,9 @@ def test_socketio():
         const socket = io('/travel/ws', { path: '/socket.io' });
 
         socket.on('connect',        ()  => { status.textContent = '✅ Connected';  add('Connected'); });
-        socket.on('disconnect',   r   => { status.textContent = `❌ Disconnect: ${r}`; add(`Disconnect: ${r}`); });
-        socket.on('connect_error', e  => { status.textContent = `❌ Error: ${e.message}`; add(`Error: ${e.message}`); });
+        socket.on('disconnect',     r   => { status.textContent = `❌ Disconnect: ${r}`; add(`Disconnect: ${r}`); });
+        socket.on('connect_error',  e   => { status.textContent = `❌ Error: ${e.message}`; add(`Error: ${e.message}`); });
+        socket.on('connected',      d   => { add(`Connected event: ${JSON.stringify(d)}`); });
       </script>
     </body>
     </html>

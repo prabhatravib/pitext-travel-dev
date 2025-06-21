@@ -68,10 +68,11 @@ class WebSocketConnection {
                     if (this.socket) {
                         this.socket.disconnect();
                     }
+                    console.error(`Connection timeout after ${this.connectionTimeout}ms`);
                     reject(new Error('Connection timeout'));
                 }, this.connectionTimeout);
 
-                // Connect to WebSocket namespace
+                // Connect to WebSocket namespace with more detailed options
                 this.socket = io(this.namespace, {
                     transports: ['websocket', 'polling'],
                     path: '/socket.io', 
@@ -80,7 +81,11 @@ class WebSocketConnection {
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
                     timeout: 20000,
-                    forceNew: false
+                    forceNew: false,
+                    // Add additional debugging
+                    autoConnect: true,
+                    upgrade: true,
+                    rememberUpgrade: true
                 });
                 
                 // Handle connection success
@@ -105,6 +110,18 @@ class WebSocketConnection {
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                         reject(new Error(`Failed to connect after ${this.maxReconnectAttempts} attempts: ${error.message}`));
                     }
+                });
+                
+                // Handle transport errors
+                this.socket.on('error', (error) => {
+                    console.error('WebSocket transport error:', error);
+                });
+                
+                // Handle disconnect
+                this.socket.on('disconnect', (reason) => {
+                    console.log('WebSocket disconnected:', reason);
+                    this.connected = false;
+                    this.connecting = false;
                 });
                 
             } catch (error) {

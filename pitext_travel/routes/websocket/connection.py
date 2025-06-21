@@ -24,41 +24,22 @@ class ConnectionHandler(BaseWebSocketHandler):
             self.log_event('connect', {'auth': auth})
             
             try:
-                # Import here to avoid circular imports
-                from pitext_travel.api.realtime.session_manager import get_session_manager
-                
                 # Ensure Flask session has an ID
                 if '_id' not in session:
                     session['_id'] = client_info['flask_session_id']
                     session.modified = True
                 
-                # Get or create Realtime session in a single atomic operation
-                manager = get_session_manager()
-                realtime_session = manager.create_session(
-                    client_info['ip'], 
-                    session['_id']
-                )
-                
-                if not realtime_session:
-                    logger.error("❌ Failed to create realtime session - rate limited")
-                    self.emit_to_client('error', {
-                        'message': 'Rate limit exceeded or server at capacity'
-                    })
-                    disconnect()
-                    return
-                
-                # Store session ID in SocketIO session
-                session['realtime_session_id'] = realtime_session.session_id
-                
-                logger.info(f"✅ Session ready: {realtime_session.session_id}")
+                # For now, just acknowledge the connection without complex session management
+                logger.info(f"✅ WebSocket connected: {client_info['sid']}")
                 
                 self.emit_to_client('connected', {
-                    'session_id': realtime_session.session_id,
+                    'session_id': client_info['sid'],
                     'status': 'connected',
                     'flask_session_id': session['_id']
                 })
                 
             except Exception as e:
+                logger.error(f"Connection error: {e}")
                 self.handle_error(e, 'connect')
                 disconnect()
         
@@ -69,10 +50,8 @@ class ConnectionHandler(BaseWebSocketHandler):
             
             if session_id:
                 try:
-                    from pitext_travel.api.realtime.session_manager import get_session_manager
-                    manager = get_session_manager()
-                    manager.deactivate_session(session_id, 'client_disconnect')
-                    logger.info(f"🔌 WebSocket disconnected, session {session_id} deactivated")
+                    # For now, just log the disconnect without complex session management
+                    logger.info(f"🔌 WebSocket disconnected, session {session_id}")
                 except Exception as e:
                     self.handle_error(e, 'disconnect')
             else:
@@ -82,7 +61,17 @@ class ConnectionHandler(BaseWebSocketHandler):
         def handle_ping():
             """Handle ping for connection testing."""
             self.emit_to_client('pong', {'timestamp': time.time()})
-            
+        
+        @self.socketio.on('test', namespace=NAMESPACE)
+        def handle_test(data):
+            """Handle test event for debugging."""
+            logger.info(f"Test event received: {data}")
+            self.emit_to_client('test_response', {
+                'message': 'Test successful',
+                'received_data': data,
+                'timestamp': time.time()
+            })
+        
         # Register default namespace handlers for compatibility
         @self.socketio.on("connect")
         def handle_default_connect():
