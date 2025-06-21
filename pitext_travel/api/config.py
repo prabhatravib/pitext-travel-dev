@@ -40,11 +40,12 @@ def get_realtime_config():
     vad_threshold = float(os.getenv("REALTIME_VAD_THRESHOLD", 0.5))
     
     # --- BEGIN DEBUG LOGGING ---
-    print("="*50)
+    print("="*60)
     print("🔧 VAD CONFIGURATION LOADED 🔧")
+    print(f"   - Environment Variable: REALTIME_VAD_SILENCE_MS={os.getenv('REALTIME_VAD_SILENCE_MS', 'NOT_SET')}")
     print(f"   - Silence Duration (ms): {vad_silence_ms}")
     print(f"   - Threshold:             {vad_threshold}")
-    print("="*50)
+    print("="*60)
     # --- END DEBUG LOGGING ---
 
     turn_cfg = TurnDetection(

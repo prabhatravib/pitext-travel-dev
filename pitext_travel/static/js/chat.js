@@ -26,7 +26,9 @@ class Chat {
     this.panel.style.display = 'block';
     
     setTimeout(() => {
-      div.scrollIntoView({behavior: 'smooth', block: 'end'});
+      if (div && div.scrollIntoView) {
+        div.scrollIntoView({behavior: 'smooth', block: 'end'});
+      }
     }, 100);
     
     return div;
@@ -66,7 +68,9 @@ class Chat {
     
     // Auto-scroll to show new content
     setTimeout(() => {
-      this.currentTranscriptBubble.scrollIntoView({behavior: 'smooth', block: 'end'});
+      if (this.currentTranscriptBubble && this.currentTranscriptBubble.scrollIntoView) {
+        this.currentTranscriptBubble.scrollIntoView({behavior: 'smooth', block: 'end'});
+      }
     }, 50);
   }
   
