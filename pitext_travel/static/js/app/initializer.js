@@ -40,6 +40,13 @@ const TravelInitializer = {
         if (window.TravelForm) {
             window.TravelForm.initializeForm();
         }
+
+        // Initialize Hexagon Interface
+        if (window.HexagonInterface) {
+            const hexInterface = new window.HexagonInterface();
+            hexInterface.initialize();
+            window.hexInterface = hexInterface; // Make it globally accessible if needed
+        }
     },
     
     /**
