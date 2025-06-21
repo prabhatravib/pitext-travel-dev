@@ -97,8 +97,10 @@ class HexagonInterface {
             { label: 'Day 3', color: '#FDFFB6' }
         ];
         
-        // Clear any existing controls
-        dayControls.innerHTML = '';
+        // Clear any existing controls completely
+        while (dayControls.firstChild) {
+            dayControls.removeChild(dayControls.firstChild);
+        }
         dayControls.style.display = 'flex';
         
         // Create checkboxes for each day
@@ -166,8 +168,10 @@ class HexagonInterface {
         const dayControls = document.getElementById('day-controls');
         if (!dayControls) return;
         
-        // Clear existing controls
-        dayControls.innerHTML = '';
+        // Clear existing controls completely
+        while (dayControls.firstChild) {
+            dayControls.removeChild(dayControls.firstChild);
+        }
         
         // Create preview controls
         for (let i = 0; i < days; i++) {
@@ -216,18 +220,11 @@ class HexagonInterface {
                 // Call original function
                 originalRenderTripOnMap.call(window.TravelApp, data);
                 
-                // Ensure day controls are visible and enabled
+                // Ensure day controls are visible - but don't interfere with the rendering
                 setTimeout(() => {
                     const dayControls = document.getElementById('day-controls');
                     if (dayControls) {
                         dayControls.style.display = 'flex';
-                        
-                        // Enable all checkboxes and labels
-                        const checkboxes = dayControls.querySelectorAll('input[type="checkbox"]');
-                        const labels = dayControls.querySelectorAll('label');
-                        
-                        checkboxes.forEach(cb => cb.disabled = false);
-                        labels.forEach(label => label.style.opacity = '1');
                     }
                 }, 100);
             };

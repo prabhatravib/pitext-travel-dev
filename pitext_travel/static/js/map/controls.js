@@ -32,6 +32,13 @@
         return;
       }
 
+      // CLEAR ANY EXISTING CONTROLS COMPLETELY
+      debugLog("Clearing existing day controls...");
+      while (controls.firstChild) {
+        controls.removeChild(controls.firstChild);
+      }
+      debugLog("Day controls cleared");
+
       // Initialize visibility: restore previous state or default to Day 1 only
       dayVisibility = window.currentDayVisibility || {};
       if (Object.keys(dayVisibility).length === 0) {
@@ -41,7 +48,8 @@
       }
       window.currentDayVisibility = dayVisibility;
 
-      controls.innerHTML = "";
+      debugLog("Day visibility initialized:", dayVisibility);
+
       controls.style.display = "flex";
       controls.style.gap = "1rem";
       controls.style.alignItems = "flex-start";
@@ -64,6 +72,7 @@
         label.style.fontSize = "0.9rem";
         label.textContent = day.label || `Day ${i + 1}`;
         label.style.cursor = "pointer";
+        label.style.opacity = "1"; // Ensure label is fully visible
         label.setAttribute("for", `day-checkbox-${i}`);
 
         // 2) Create the checkbox itself
@@ -71,12 +80,15 @@
         checkbox.type = "checkbox";
         checkbox.id = `day-checkbox-${i}`;
         checkbox.checked = dayVisibility[i] !== false;  // Use restored state
+        checkbox.disabled = false;  // ADD THIS LINE to ensure it's not disabled
         checkbox.style.cursor = "pointer";
         checkbox.style.width = "18px";
         checkbox.style.height = "18px";
 
         // When toggled, this will show/hide markers & routes for this day
         checkbox.onchange = () => toggleDay(i, days.length);
+
+        debugLog(`Created day control ${i + 1}: checked=${checkbox.checked}, disabled=${checkbox.disabled}`);
 
         // 3) Assemble & append
         wrapper.appendChild(label);
@@ -110,14 +122,30 @@
       // Save state globally
       window.currentDayVisibility = dayVisibility;
 
+      debugLog(`Day ${dayIndex + 1} visibility set to: ${dayVisibility[dayIndex]}`);
+
       // Update UI
-      toggleMarkersForDay(dayIndex, dayVisibility[dayIndex]);
-      toggleRoutesForDay(dayIndex, dayVisibility[dayIndex]);
+      if (toggleMarkersForDay) {
+        debugLog(`Calling toggleMarkersForDay(${dayIndex}, ${dayVisibility[dayIndex]})`);
+        toggleMarkersForDay(dayIndex, dayVisibility[dayIndex]);
+      } else {
+        debugLog("WARNING: toggleMarkersForDay function not available");
+      }
+
+      if (toggleRoutesForDay) {
+        debugLog(`Calling toggleRoutesForDay(${dayIndex}, ${dayVisibility[dayIndex]})`);
+        toggleRoutesForDay(dayIndex, dayVisibility[dayIndex]);
+      } else {
+        debugLog("WARNING: toggleRoutesForDay function not available");
+      }
 
       // Also update the checkbox state visually
       const checkbox = document.getElementById(`day-checkbox-${dayIndex}`);
       if (checkbox) {
         checkbox.checked = dayVisibility[dayIndex];
+        debugLog(`Updated checkbox ${dayIndex} to checked: ${dayVisibility[dayIndex]}`);
+      } else {
+        debugLog(`WARNING: Checkbox ${dayIndex} not found in DOM`);
       }
     }
 
@@ -138,7 +166,10 @@
     function clearDayControls() {
       const controls = document.getElementById("day-controls");
       if (controls) {
-        controls.innerHTML = "";
+        // CLEAR ANY EXISTING CONTROLS COMPLETELY
+        while (controls.firstChild) {
+          controls.removeChild(controls.firstChild);
+        }
       }
       // Also reset the underlying visibility state.
       // This is crucial for ensuring a clean slate when a new trip is rendered.
