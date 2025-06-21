@@ -137,11 +137,6 @@ const TravelInitializer = {
             debugLog("🎤 Voice command generated itinerary:", data);
             
             if (data.itinerary) {
-                // Add a confirmation message to the chat panel
-                if (window.chatInstance && data.city && data.days) {
-                    window.chatInstance.addBubble('assistant', `I've created your ${data.days}-day itinerary for ${data.city}! You can see it on the map.`);
-                }
-
                 window.tripData = data.itinerary;
                 
                 // Force map rendering with retry logic

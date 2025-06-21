@@ -195,6 +195,8 @@ class RealtimeClient:
             # Audio/transcript events
             case "response.audio_transcript.delta":
                 self._handle_transcript_delta(event)
+            case "response.audio_transcript.done":
+                self._handle_transcript_done(event)
             case "response.audio.delta":
                 self._handle_audio_delta(event)
                 
@@ -266,6 +268,10 @@ class RealtimeClient:
     def _handle_transcript_delta(self, event):
         if self.on_transcript:
             self.on_transcript(event.get("delta", ""), event.get("item_id"), False)
+            
+    def _handle_transcript_done(self, event):
+        if self.on_transcript:
+            self.on_transcript(event.get("transcript", ""), event.get("item_id"), True)
 
     def _handle_audio_delta(self, event):
         if self.on_audio_chunk:
@@ -380,9 +386,3 @@ class RealtimeClient:
                 },
             }
         )
-        
-        # Add a small delay before creating response to avoid conflicts
-        import time
-        time.sleep(0.1)
-        
-        self._send_event({"type": "response.create"})
