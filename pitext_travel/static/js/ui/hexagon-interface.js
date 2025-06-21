@@ -28,15 +28,20 @@ class HexagonInterface {
         
         // Initialize voice if available
         if (window.VoiceUI) {
-            this.voiceController = new window.VoiceUI();
-            await this.voiceController.initialize();
-            
-            // Override the voice button with our mic button
-            this.voiceController.buttonEl = this.micButton;
-            this.voiceController.statusText = null; // We don't use status text
-            
-            // Set up voice event handlers
-            this.setupVoiceHandlers();
+            try {
+                this.voiceController = new window.VoiceUI();
+                await this.voiceController.initialize();
+                
+                // Override the voice button with our mic button
+                this.voiceController.buttonEl = this.micButton;
+                this.voiceController.statusText = null; // We don't use status text
+                
+                // Set up voice event handlers
+                this.setupVoiceHandlers();
+            } catch (error) {
+                console.log('Voice controller initialization failed:', error);
+                // Voice will be set up later when ready
+            }
         }
         
         console.log('HexagonInterface ready');
@@ -239,6 +244,14 @@ class HexagonInterface {
     
     setupVoiceHandlers() {
         if (!this.voiceController) return;
+        
+        // Check if controller is available
+        if (!this.voiceController.controller) {
+            console.log('Voice controller not ready yet, will setup handlers later');
+            // Retry after a short delay
+            setTimeout(() => this.setupVoiceHandlers(), 500);
+            return;
+        }
         
         // Override the click handler
         this.micButton.removeEventListener('click', this.voiceController.toggleListening);
