@@ -124,11 +124,6 @@ class AudioCapture {
 
       const inputFloat = event.inputBuffer.getChannelData(0);
       
-      // Check if audio contains speech
-      if (!this._containsSpeech(inputFloat)) {
-        return; // Skip silent audio
-      }
-
       // Down-sample if necessary
       const float24 = downsampleTo24kHz(inputFloat, this.audioContext.sampleRate);
       
