@@ -18,20 +18,40 @@ def _get_client() -> googlemaps.Client:
     """Return a cached googlemaps.Client instance."""
     global _gmaps
     if _gmaps is None:
-        cfg = get_google_maps_config()          # expects {"api_key": "..."}
-        _gmaps = googlemaps.Client(key=cfg["api_key"])
+        try:
+            cfg = get_google_maps_config()
+            api_key = cfg.get("api_key", "")
+            if not api_key:
+                logger.error("No Google Maps API key found in config")
+                return None
+            logger.info(f"Initializing Google Maps client with key: {api_key[:10]}...")
+            _gmaps = googlemaps.Client(key=api_key)
+        except Exception as e:
+            logger.error(f"Failed to initialize Google Maps client: {e}")
+            return None
     return _gmaps
-
 
 def get_coordinates_for_place(place: str) -> tuple[float, float] | None:
     """Resolve a free-text place name to (lat, lng) or None if not found."""
-    client = _get_client()
-    results = client.geocode(place, language="en")
-    if not results:
+    try:
+        client = _get_client()
+        if client is None:
+            logger.error("No Google Maps client available")
+            return None
+            
+        logger.info(f"Geocoding place: {place}")
+        results = client.geocode(place, language="en")
+        
+        if not results:
+            logger.warning(f"No results found for place: {place}")
+            return None
+            
+        loc = results[0]["geometry"]["location"]
+        logger.info(f"Geocoded {place} to {loc['lat']}, {loc['lng']}")
+        return loc["lat"], loc["lng"]
+    except Exception as e:
+        logger.error(f"Geocoding error for '{place}': {e}")
         return None
-    loc = results[0]["geometry"]["location"]
-    return loc["lat"], loc["lng"]
-
 
 # ────────────────────────────────────────────────────────────────────────────────
 # NEW: itinerary post-processor
